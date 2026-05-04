@@ -1,4 +1,3 @@
-// frontend/app.js
 const testButton = document.getElementById('test-btn');
 const resultText = document.getElementById('result-text');
 
@@ -11,4 +10,5 @@ testButton.addEventListener('click', async () => {
         resultText.textContent = "Error: Could not connect to backend.";
         resultText.style.color = "red";
     }
-});
+})
+

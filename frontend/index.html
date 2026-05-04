@@ -1,14 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Plafin</title>
-</head>
-<body>
-<h1>Plafin</h1>
-<button id="test-btn">Test Backend Connection</button>
-<p id="result-text" style="color: green; font-weight: bold;"></p>
+<html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script src="./onload.js"></script>
 
-<script src="app.js"></script>
-</body>
+    </head>
+    <body>
+        <div class="m-3 card">
+            <div class="card-body">
+                <h5 class="card-title" id="info">Not logged in</h5>
+                <a class="button" id="login" style="display:none;"
+                   href="https://discord.com/oauth2/authorize?client_id=1500902919166234844&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A3000&scope=identify">Discord
+                    Login</a>
+                <br>
+                <div class="row mb-3">
+                    <div class="col-3">Your Coins</div>
+                    <div class="col-9" id="coins">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </body>
 </html>

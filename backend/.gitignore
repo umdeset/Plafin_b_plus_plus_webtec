@@ -1,0 +1,11 @@
+# 1. NEVER UPLOAD SECRETS
+.env
+
+# 2. NEVER UPLOAD DEPENDENCIES
+# (They are too big, the live server will download its own copy)
+node_modules/
+
+# 3. IDE AND OS HIDDEN FILES
+# (WebStorm configuration files that your teammates don't need)
+.idea/
+.DS_Store
