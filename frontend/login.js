@@ -21,90 +21,112 @@ const getUser = async (tokenType, accessToken) => {
         headers: {
             authorization: `${tokenType} ${accessToken}`,
         },
-    })
+    });
 
     const resultJson = await result.json()
-    const { username, id, coins } = resultJson;
-    document.getElementById('coins').innerText = coins;
-    document.getElementById('info').innerText = `Logged in as: ${username} (id: ${id})`;
+    const { username, id } = resultJson;
+    if(document.getElementById('info')) document.getElementById("info").innerText = `Logged in as: ${username} (id: ${id})`;
     return resultJson
 }
 
-//-----------------------------------------------Discord Login Functions------------------------------------------------------------
+//helper function to check Discord state
+const checkDiscordLogin = async () => {
+    const accessToken = window.localStorage.getItem("access_token");
+    const tokenType = window.localStorage.getItem("token_type");
+    const url = new URLSearchParams(window.location.search);
+    const code = url.get("code");
 
-window.onload = async () => {
-    // Check session
-    fetch("/session")
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            currentSession = data || null;
-        })
-        .catch(error => {
-            console.error('Failed to load session:', error);
-            currentSession = null;
-        });
-    const accessToken = window.localStorage.getItem("access_token")
-
-    const tokenType = window.localStorage.getItem("token_type")
-
-    const fragment = new URLSearchParams(window.location.search);
-    const code = fragment.get('code')
-
-    if (!code && !accessToken) {
-        document.getElementById('login').style.display = `block`;
-        return
-    }
-
+    //when comes back from discord with code
     if (code && !accessToken) {
-        window.history.replaceState({}, document.title, "/");  // set url to "/"
-        const result = await getToken(code)
+        //cleans the url
+        window.history.replaceState({}, document.title, "/");
+        const result = await getToken(code);
         if (result.token_type && result.access_token) {
-            window.localStorage.setItem("token_type", result.token_type)
-            window.localStorage.setItem("access_token", result.access_token)
-            getUser(result.token_type, result.access_token)
-            location.href = "dashboard.html"
+            await getUser(result.token_type, result.access_token);
+            location.href = "dashboard.html";
+            return true; //login successfull
         }
     }
+
+    //when discord token is already safed
     if (accessToken) {
-        getUser(tokenType, accessToken)
-        location.href = "dashboard.html" //?token=" + accessToken
+        await getUser(tokenType, accessToken);
+        location.href = "dashboard.html";
+        return true;
     }
 
-    // Login dialog
-    document.getElementById('loginForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
+    return false; //if no discord login was found
+}
 
-        // Task 1.1: Implement the login submit flow to call `POST /login`
-        // with username and password, handle errors, save the response
-        // into `currentSession`, then call `updateUI()` and `loadMovies()`.
+//-----------------------------------------------Normal Session Functions------------------------------------------------------------
+const checkNormalSession = async () => {
+    try {
+        const response = await fetch('/session');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
 
-        //Objects.fromEntries() transforms a list of key-value pairs into an Object
-        const data = Object.fromEntries(formData);
-        fetch(`/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(data),
+        if (data && Object.keys(data).length > 0) {
+            currentSession = data;
+            location.href = "dashboard.html";
+            return true;
+        }
+        return false;
+    }catch(err) {
+        console.error("No session found: " + err);
+        currentSession = null;
+        return false;
+    }
+}
+
+//-----------------------------------------------Onload/Initialization------------------------------------------------------------
+
+window.onload = async () => {
+
+    const loginForm = document.getElementById('loginForm');
+    if(loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            //prevents browser default behaviour/reloading the page and lets the JS fetch /login code
+            e.preventDefault();
+            //The FormData interface provides a way to construct a set of key/value pairs representing form fields and their values, which can be sent using the fetch(), XMLHttpRequest.send() or navigator.sendBeacon() methods. (got it from mozilla.org)
+            const formData = new FormData(e.target);
+            //gets username and password from URL
+            const data = Object.fromEntries(formData);
+
+            //try and catch not fetch and then because of race conditions between normal and discord login
+            try{
+                //creates session
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data),
+                });
+
+                //if pw is wrong or there was an error
+                if(!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                currentSession = await response.json();
+                //if login was successful, redirect to dashboard
+                location.href = "dashboard.html";
+            }catch(err) {
+                console.error('Failed to login: ' + err);
+                alert("Failed to login! Check username and password.");
+            }
         })
-            .then(response => {
-                if(!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                currentSession = data;
-            })
-            .catch(error => {
-                console.error('Failed to load login:', error);
-            })
+    }
 
+    //Checks if logged in normaly
+    const hasNormalSession = await checkNormalSession();
+    //stops if true, if false checks next
+    if (hasNormalSession) return;
 
-    });
+    //Checks if logged in through discord
+    const hasDiscordLogin = await checkDiscordLogin();
+    //stops if true, if false goes to next
+    if (hasDiscordLogin) return;
 
+    //if no login worked, shows login screen
+    const noLoginWorked = document.getElementById('login');
+    if (noLoginWorked) {
+        noLoginWorked.style.display = 'block';
+    }
 }

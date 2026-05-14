@@ -33,7 +33,6 @@ app.get('/', (req, res) => {
 });
 
 app.post("/login", function (req, res) {
-    console.log("hi wie geht es dir");
     const { username, password } = req.body;
     //searches for user entry
     const user = userModel[username];
@@ -56,6 +55,7 @@ app.get("/logout", function (req, res) {
     res.sendStatus(200);
 });
 
+//sends session from user
 app.get("/session", function (req, res) {
     if (req.session.user) {
         res.send(req.session.user);
