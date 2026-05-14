@@ -1,0 +1,16 @@
+{
+  "joe": {
+    "username": "joe",
+    "password": "$2b$10$DZ8jJb59OIdfWJL8q2r7suPwDL/KnoC4jGm7pQqyd0ikBBc8yReeS",
+    "_comment": "Das Passwort für 'joe' ist '123'",
+    "firstName": "Joe",
+    "lastName": "Doe"
+  },
+  "jane": {
+    "username": "jane",
+    "password": "$2b$10$bG3pmV8hLQASdattED83MOqLvaJq3nKKvyVK69ipc6WYr43cQQ/Ei",
+    "_comment": "Das Passwort für 'jane' ist '345'",
+    "firstName": "Jane",
+    "lastName": "Doe"
+  }
+}
