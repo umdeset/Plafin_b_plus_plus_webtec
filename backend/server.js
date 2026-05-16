@@ -18,6 +18,7 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Session middleware
 // instead of nodemon, use node server/server.js
+// maybe use helmet later on
 app.use(session({
     //needs to store the sessio somewhere
     store: new FileStore({ path: './sessions' }),
@@ -25,8 +26,23 @@ app.use(session({
     resave: false,
     //tells the server that the session is stored
     saveUninitialized: false,
-    cookie: { secure: false } // Set to true if using HTTPS
+    cookie: {
+        secure: false,      // Set to true if using HTTPS
+        httpOnly: true,     //makes it harder to steal cookies using JS
+        sameSite:'strict'   //prevents cross-site request forgery attacks (example: you leave Plafin open in a new tab and visit a malicious website, the website could send a request via the open Plafin tab)
+    }
 }));
+
+//required login so people are not allowed to make Post requests without being logged in
+//middleware
+//used for post methods
+const requiredLogin = (req, res, next) => {
+    if(req.session.user) {
+        next();
+    }else{
+        res.status(401).send('Not logged in');
+    }
+}
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/login.html'));
@@ -77,45 +93,73 @@ app.get('/dashboard', (req, res) => {
 //-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
 //exchange code for access token
 //async because it needs to wait for an exteral server
-app.post('/getToken', async (req, res) => {
-    const tokenResponseData = await fetch('https://discord.com/api/oauth2/token', {
-        method: 'POST',
-        body: new URLSearchParams({
-            client_id: config.discord_Client_ID,
-            client_secret: config.discord_Client_Secret,
-            code:req.body.code,
-            grant_type: 'authorization_code',
-            redirect_uri: "http://localhost:3000",
-            scope: 'identify',
-        }).toString(),
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-    });
+app.post('/auth/discord', async (req, res) => {
+   try{
+        const tokenResponseData = await fetch('https://discord.com/api/oauth2/token', {
+            method: 'POST',
+            body: new URLSearchParams({
+                client_id: config.discord_Client_ID,
+                client_secret: config.discord_Client_Secret,
+                code:req.body.code,
+                grant_type: 'authorization_code',
+                redirect_uri: "http://localhost:3000",
+                scope: 'identify',
+            }).toString(),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+        });
 
-    const oauthData = await tokenResponseData.json();
-    return res.json(oauthData);
+        const oAuthData = await tokenResponseData.json();
+
+        if(!oAuthData.access_token) {
+            console.log("Discord Error: " + oAuthData);
+            return res.status(400).json({error: "Could not get Discord token"});
+        }
+
+        //requests user from discord
+        const me = await fetch('https://discord.com/api/users/@me', {
+            headers: {
+                authorization: `${oAuthData.token_type} ${oAuthData.access_token}`,
+            },
+        });
+
+        const discordUser = await me.json()
+
+        //local session gets created with discord information
+        req.session.user = {
+            id: discordUser.id,
+            username: discordUser.username,
+            loginMethod: 'discord'
+        };
+
+        res.status(200).json({success: true})
+   }catch(err){
+       console.error("Discord Auth failed: " + err);
+       res.sendStatus(500).json({error: "Internal Server Error during Discord authentication"});
+   }
 });
 
 //exchange access Token for user
-app.get("/p/getDiscordUser", async (req, res) => {
-    const authString = req.headers.authorization;
-    const me = await fetch('https://discord.com/api/users/@me', {
-        headers: {
-            authorization: authString,
-        },
-    })
-    if (!me.ok) {
-        return false;
-    }
-    const response = await me.json();
-
-    const {id, username} = response;
-    const coins = memory[id] || 0
-    if (!coins) { memory[id] = 0 }
-    const user = { id, username, coins }
-    res.json(user)
-});
+//combined with other method above
+//app.get("/p/getDiscordUser", async (req, res) => {
+//    const authString = req.headers.authorization;
+//    const me = await fetch('https://discord.com/api/users/@me', {
+//        headers: {
+//            authorization: authString,
+//        },
+//    })
+//    if (!me.ok) {
+//        return false;
+//    }
+//    const response = await me.json();
+//
+//    const {id, username} = response;
+//    const coins = memory[id] || 0
+//    if (!coins) { memory[id] = 0 }
+//    const user = { id, username, coins }
+//    res.json(user)
+//});
 
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
