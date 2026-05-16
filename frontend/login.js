@@ -1,61 +1,31 @@
+//we only need current Session for local saved users
+//this is because
 let currentSession = null;
 
 //-----------------------------------------------Discord Login Functions------------------------------------------------------------
-const getToken = async (code) => {
-    const result = await fetch('http://localhost:3000/getToken', {
-        method: 'POST',
-        body: JSON.stringify({ code }),
-        headers: {
-            "Content-Type": "application/json",
-        },
-    })
-
-    const resultJson = await result.json()
-    window.localStorage.setItem("access_token", resultJson.access_token)
-    window.localStorage.setItem("token_type", resultJson.token_type)
-    return resultJson
-}
-
-const getUser = async (tokenType, accessToken) => {
-    const result = await fetch('http://localhost:3000/p/getDiscordUser', {
-        headers: {
-            authorization: `${tokenType} ${accessToken}`,
-        },
-    });
-
-    const resultJson = await result.json()
-    const { username, id } = resultJson;
-    if(document.getElementById('info')) document.getElementById("info").innerText = `Logged in as: ${username} (id: ${id})`;
-    return resultJson
-}
-
-//helper function to check Discord state
 const checkDiscordLogin = async () => {
-    const accessToken = window.localStorage.getItem("access_token");
-    const tokenType = window.localStorage.getItem("token_type");
     const url = new URLSearchParams(window.location.search);
     const code = url.get("code");
-
-    //when comes back from discord with code
-    if (code && !accessToken) {
-        //cleans the url
+    if (code) {
+        //clean to not show any data
         window.history.replaceState({}, document.title, "/");
-        const result = await getToken(code);
-        if (result.token_type && result.access_token) {
-            await getUser(result.token_type, result.access_token);
-            location.href = "dashboard.html";
-            return true; //login successfull
+
+        try{
+            const response = fetch("/auth/discord",{
+                method: "POST",
+                headers: {"Content-type": "application/json"},
+                body: JSON.stringify({code})
+            });
+
+            if(response){
+                location.href="dashboard.html"
+                return true;
+            }
+        }catch(err){
+            console.error("Failed to authenticate with Discord: " + err);
         }
     }
-
-    //when discord token is already safed
-    if (accessToken) {
-        await getUser(tokenType, accessToken);
-        location.href = "dashboard.html";
-        return true;
-    }
-
-    return false; //if no discord login was found
+    return false;
 }
 
 //-----------------------------------------------Normal Session Functions------------------------------------------------------------
@@ -114,12 +84,14 @@ window.onload = async () => {
         })
     }
 
-    //Checks if logged in normaly
-    const hasNormalSession = await checkNormalSession();
+    //Checks if already logged in normaly
+    //checks if session is already there
+    //is used first in case the user logged in with discord and already has a session
+    const hasSession = await checkNormalSession();
     //stops if true, if false checks next
-    if (hasNormalSession) return;
+    if (hasSession) return;
 
-    //Checks if logged in through discord
+    //Checks if logged in through discord and creates a session for him
     const hasDiscordLogin = await checkDiscordLogin();
     //stops if true, if false goes to next
     if (hasDiscordLogin) return;
