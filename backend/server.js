@@ -10,6 +10,7 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 const memory = {}
+const fs = require('fs');
 
 
 // Parse urlencoded bodies
@@ -81,11 +82,48 @@ app.get("/session", function (req, res) {
 });
 
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard',requiredLogin, (req, res) => {
     if(req.session.user) {
         res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
     }else{
         res.redirect('/');
+    }
+});
+
+app.post('/register', function (req, res) {
+    const {email, registerUsername, registerPassword, confirmPassword} = req.body;
+
+    if(userModel[registerUsername]){
+        return res.status(409).json({error: "Username is already taken"});
+    }
+
+    for(const user of Object.values(userModel)) {
+        if(user.email === email){
+            return res.status(409).json({error: "Email already exists"});
+        }
+    }
+
+    if(registerPassword !== confirmPassword){
+        return res.status(401).json({error: "Password does not match"});
+    }
+
+
+    const hashedPassword = bcrypt.hashSync(registerPassword, 10);
+
+    userModel[registerUsername] = {
+        username: registerUsername,
+        password: hashedPassword,
+        email: email
+    }
+
+
+    try{
+        const userFilePath = path.join(__dirname, 'users.json');
+        fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
+        res.status(200).json({message: 'Successfully created user'});
+    }catch(err){
+        console.error("Error creating user: " + err);
+        res.status(500).json({error: "Internal Server Error"});
     }
 });
 
@@ -160,6 +198,17 @@ app.post('/auth/discord', async (req, res) => {
 //    const user = { id, username, coins }
 //    res.json(user)
 //});
+
+
+// group endpoints later
+
+//users should also have an id
+//app.post('/api/users')        Create User
+//app.delete('/api/users/:id')  Delete Users
+//app.get('/api/groups')        Get groups
+//app.post('/api/groups')       Create group
+//app.put('/api/groups:id')     Update group
+//app.delete('/api/groups/:id') Delete group
 
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');

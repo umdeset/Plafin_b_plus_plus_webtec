@@ -9,7 +9,7 @@
 </head>
 <body>
 
-<div class="login-container">
+<div id="login-container" class="login-container">
     <h2>Welcome Back</h2>
 
     <!-- Notice the method="POST" and action="/login".
@@ -27,7 +27,7 @@
         </div>
 
         <button type="submit" class="btn btn-login">Login</button>
-        <button type="button" class="btn btn-register">Create an Account</button>
+        <button id="registerBtn" type="button" class="btn btn-register">Create an Account</button>
 
         <div class="divider">OR</div>
 
@@ -40,30 +40,28 @@
         </a>
     </form>
 </div>
-
+<div id="register-container" class="register-container">
+    <h2>Register</h2>
+    <form id="registerForm">
+        <div class="input-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" placeholder="Enter your email" required>
+        </div>
+        <div class="input-group">
+            <label for="registerUsername">Username</label>
+            <input type="text" id="registerUsername" name="registerUsername" placeholder="Enter your username" required>
+        </div>
+        <div class="input-group">
+            <label for="registerPassword">Password</label>
+            <input type="password" id="registerPassword" name="registerPassword" placeholder="Enter your password" required>
+        </div>
+        <div class="input-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required>
+        </div>
+        <button type="submit" class="btn btn-login">Register</button>
+        <button id="backToLoginBtn" type="button" class="btn btn-register">Back to Login</button>
+    </form>
+</div>
 </body>
 </html>
-
-<!--<!DOCTYPE html>-->
-<!--<html>-->
-<!--    <head>-->
-<!--        <meta name="viewport" content="width=device-width, initial-scale=1" />-->
-<!--        <script src="login.js"></script>-->
-
-<!--    </head>-->
-<!--    <body>-->
-<!--        <div class="m-3 card">-->
-<!--            <div class="card-body">-->
-<!--                <h5 class="card-title" id="info">Not logged in</h5>-->
-<!--                <a class="button" id="login" style="display:none;"-->
-<!--                   href="https://discord.com/oauth2/authorize?client_id=1500902919166234844&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A3000&scope=identify">Discord-->
-<!--                    Login</a>-->
-<!--                <br>-->
-<!--                <div class="row mb-3">-->
-<!--                    <div class="col-3">Your Coins</div>-->
-<!--                    <div class="col-9" id="coins">Loading...</div>-->
-<!--                </div>-->
-<!--            </div>-->
-<!--        </div>-->
-<!--    </body>-->
-<!--</html>-->
