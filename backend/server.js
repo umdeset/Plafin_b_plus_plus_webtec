@@ -263,7 +263,46 @@ app.post("/groups", requiredLogin, (req, res) => {
     res.status(200).json({success: true});
 })
 
+app.delete("/groups/:id", requiredLogin, (req, res) => {
+    const groupId = parseInt(req.params.id);
+    const groupIndex = testGroups.findIndex(group => group.id === groupId);
 
+    if(groupIndex === -1) {
+        return res.status(404).json({error: "Group not found"});
+    }
+    const group = testGroups[groupIndex];
+    if(group.creator !== req.session.user.creator){
+        return res.status(401).json({error: "User not found"});
+    }
+
+    testGroups.splice(groupIndex, 1);
+    res.status(200).json({success: true, message: "Group deleted successfully."});
+})
+
+app.put("/groups/:id", requiredLogin, (req, res) => {
+    const groupId = parseInt(req.params.id, 10);
+    const {description, maxPlayers} = req.body;
+    const groupIndex = testGroups.findIndex(group => group.id === groupId);
+
+    if(groupIndex === -1) {
+        return res.status(404).json({error: "Group not found"});
+    }
+
+    const group = testGroups[groupIndex];
+
+    if(group.creator !== req.session.user.creator){
+        return res.status(403).json({error: "You can only edit your own groups"});
+    }
+
+    if(description){
+        group.description = description;
+    }
+
+    if(maxPlayers){
+        group.maxPlayers = parseInt(maxPlayers);
+    }
+    res.status(200).json({success: true, group: group, message: "Group updated successfully."});
+})
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
 });
