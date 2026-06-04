@@ -11,7 +11,7 @@ const checkDiscordLogin = async () => {
         window.history.replaceState({}, document.title, "/");
 
         try{
-            const response = fetch("/auth/discord",{
+            const response = await fetch("/auth/discord",{
                 method: "POST",
                 headers: {"Content-type": "application/json"},
                 body: JSON.stringify({code})
