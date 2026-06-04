@@ -10,6 +10,7 @@ const bcrypt = require("bcrypt");
 
 const app = express();
 const memory = {}
+const fs = require('fs');
 
 
 // Parse urlencoded bodies
@@ -81,13 +82,54 @@ app.get("/session", function (req, res) {
 });
 
 
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard',requiredLogin, (req, res) => {
     if(req.session.user) {
         res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
     }else{
         res.redirect('/');
     }
 });
+
+app.post('/register', function (req, res) {
+    const {email, registerUsername, registerPassword, confirmPassword} = req.body;
+
+    if(userModel[registerUsername]){
+        return res.status(409).json({error: "Username is already taken"});
+    }
+
+    for(const user of Object.values(userModel)) {
+        if(user.email === email){
+            return res.status(409).json({error: "Email already exists"});
+        }
+    }
+
+    if(registerPassword !== confirmPassword){
+        return res.status(401).json({error: "Password does not match"});
+    }
+
+
+    const hashedPassword = bcrypt.hashSync(registerPassword, 10);
+
+    userModel[registerUsername] = {
+        username: registerUsername,
+        password: hashedPassword,
+        email: email
+    }
+
+
+    try{
+        const userFilePath = path.join(__dirname, 'users.json');
+        fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
+        res.status(200).json({message: 'Successfully created user'});
+    }catch(err){
+        console.error("Error creating user: " + err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
+});
+
+//app.delete("/deleteAccount", function (req, res) {
+//    const {}
+//})
 
 
 //-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
@@ -161,6 +203,106 @@ app.post('/auth/discord', async (req, res) => {
 //    res.json(user)
 //});
 
+
+// group endpoints later
+
+//app.delete('/api/users/:id')  Delete Users
+//app.get('/api/groups')        Get groups
+//app.post('/api/groups')       Create group
+//app.put('/api/groups:id')     Update group
+//app.delete('/api/groups/:id') Delete group
+
+//testGroup for endpoints, later in db
+let testGroups = [{
+        id: 1,
+        game: "Valorant",
+        description: "Looking for friends",
+        maxPlayers: 5,
+        currentPlayers: 3, //later depends on users in group
+        creator: "TestUser", //later username of creator
+        //only testdata later other things like tags, rank, usw...
+    },
+    {
+        id: 2,
+        game: "Minecraft",
+        description: "Chill vanilla",
+        maxPlayers: 10,
+        currentPlayers: 2,
+        creator: "TestUser2",
+    }
+];
+let nextGroupID = 3;
+
+//get groups
+//SELECT * FROM groups
+app.get("/groups", (req, res) => {
+    res.status(200).json(testGroups);
+});
+
+//create groups
+app.post("/groups", requiredLogin, (req, res) => {
+    const username = req.session.username;
+    const {game, description, maxPlayers} = req.body;
+
+    if(!game || !description || !maxPlayers){
+        return res.status(401).json({error: "Please fill out all the fields."});
+    }
+
+    const newGroup = {
+        id: nextGroupID++,
+        game: game,
+        description: description,
+        maxPlayers: parseInt(maxPlayers),
+        currentPlayers: 1,
+        creator: username,
+    }
+
+    //INSERT INTO groups
+    testGroups.push(newGroup);
+    //remember to ask if we want to change the whole website to the creat Party interface or only a pop up window (dialog or whatever it is called)
+    res.status(200).json({success: true});
+})
+
+app.delete("/groups/:id", requiredLogin, (req, res) => {
+    const groupId = parseInt(req.params.id);
+    const groupIndex = testGroups.findIndex(group => group.id === groupId);
+
+    if(groupIndex === -1) {
+        return res.status(404).json({error: "Group not found"});
+    }
+    const group = testGroups[groupIndex];
+    if(group.creator !== req.session.user.creator){
+        return res.status(401).json({error: "User not found"});
+    }
+
+    testGroups.splice(groupIndex, 1);
+    res.status(200).json({success: true, message: "Group deleted successfully."});
+})
+
+app.put("/groups/:id", requiredLogin, (req, res) => {
+    const groupId = parseInt(req.params.id, 10);
+    const {description, maxPlayers} = req.body;
+    const groupIndex = testGroups.findIndex(group => group.id === groupId);
+
+    if(groupIndex === -1) {
+        return res.status(404).json({error: "Group not found"});
+    }
+
+    const group = testGroups[groupIndex];
+
+    if(group.creator !== req.session.user.creator){
+        return res.status(403).json({error: "You can only edit your own groups"});
+    }
+
+    if(description){
+        group.description = description;
+    }
+
+    if(maxPlayers){
+        group.maxPlayers = parseInt(maxPlayers);
+    }
+    res.status(200).json({success: true, group: group, message: "Group updated successfully."});
+})
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
 });

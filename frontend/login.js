@@ -18,7 +18,8 @@ const checkDiscordLogin = async () => {
             });
 
             if(response){
-                location.href="dashboard.html"
+                //i used replace so that if we use the browser's integrated go back button we do not go back to the login screen
+                location.replace("/dashboard")
                 return true;
             }
         }catch(err){
@@ -37,7 +38,7 @@ const checkNormalSession = async () => {
 
         if (data && Object.keys(data).length > 0) {
             currentSession = data;
-            location.href = "dashboard.html";
+            location.replace("/dashboard");
             return true;
         }
         return false;
@@ -52,7 +53,28 @@ const checkNormalSession = async () => {
 
 window.onload = async () => {
 
+    const loginContainer = document.getElementById("login-container");
+    const registerContainer = document.getElementById("register-container");
+    const registerButton = document.getElementById("registerBtn");
+    const backToLoginBtn = document.getElementById("backToLoginBtn");
     const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+
+    //switch to register
+    if(registerButton) {
+        registerButton.addEventListener("click" , () => {
+            loginContainer.style.display = "none";
+            registerContainer.style.display = "block";
+        });
+    }
+    //switch to login
+    if(backToLoginBtn) {
+        backToLoginBtn.addEventListener("click" , () => {
+            registerContainer.style.display = "none";
+            loginContainer.style.display = "block";
+        })
+    }
+
     if(loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             //prevents browser default behaviour/reloading the page and lets the JS fetch /login code
@@ -76,10 +98,34 @@ window.onload = async () => {
 
                 currentSession = await response.json();
                 //if login was successful, redirect to dashboard
-                location.href = "dashboard.html";
+                location.replace("/dashboard");
             }catch(err) {
                 console.error('Failed to login: ' + err);
                 alert("Failed to login! Check username and password.");
+            }
+        })
+    }
+    if(registerForm){
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try{
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data),
+                });
+
+                if(!response.ok){
+                    const errorData = await response.json();
+                    throw new Error(errorData.error);
+                }
+                backToLoginBtn.click()
+            }catch(err) {
+                console.error('Failed to register: ' + err);
+                alert(err);
             }
         })
     }
