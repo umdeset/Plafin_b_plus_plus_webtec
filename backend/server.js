@@ -2,21 +2,21 @@ const express = require('express');
 //node:path tells node.js to ignore the node_modules folder
 const path = require('node:path');
 const session = require("express-session");
-const bodyParser = require('body-parser');
 const userModel = require("./user-model.js");
 const config = require('./config');
 const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
-
+const connectDB = require('./db-connection.js');
 const app = express();
-const memory = {}
 const fs = require('fs');
-
 
 // Parse urlencoded bodies
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../frontend')));
-
+let db;
+connectDB().then(client => {
+    db = client;
+});
 // Session middleware
 // instead of nodemon, use node server/server.js
 // maybe use helmet later on
@@ -90,41 +90,73 @@ app.get('/dashboard',requiredLogin, (req, res) => {
     }
 });
 
-app.post('/register', function (req, res) {
+//for later give error for Username or Email if User already exists
+app.post('/register', async (req, res) => {
     const {email, registerUsername, registerPassword, confirmPassword} = req.body;
 
-    if(userModel[registerUsername]){
-        return res.status(409).json({error: "Username is already taken"});
-    }
 
-    for(const user of Object.values(userModel)) {
-        if(user.email === email){
-            return res.status(409).json({error: "Email already exists"});
+    if(registerPassword !== confirmPassword) {
+        return res.status(401).send('Passwords don\'t match');
+    }
+    try{
+        //passwort verschlüsseln
+        const saltRounds = 10;
+        const password_hash = await bcrypt.hash(registerPassword, saltRounds);
+
+        const query = `
+            INSERT INTO users (username, email, password_hash) 
+            VALUES ($1, $2, $3) 
+            RETURNING id, username;
+        `;
+
+        const values = [registerUsername, email, password_hash];
+
+        const result = await db.query(query, values);
+
+        console.log("New User saved in database: ",result.rows[0]);
+        res.status(201).send("Registration successful");
+    }catch(err){
+        console.error("Error with registration", err);
+
+        if(err.code==="23505"){
+            res.status(401).json({error: "User already exists"});
+        }else{
+            res.status(500).json({error:"Internal Server Error"});
         }
     }
 
-    if(registerPassword !== confirmPassword){
-        return res.status(401).json({error: "Password does not match"});
-    }
-
-
-    const hashedPassword = bcrypt.hashSync(registerPassword, 10);
-
-    userModel[registerUsername] = {
-        username: registerUsername,
-        password: hashedPassword,
-        email: email
-    }
-
-
-    try{
-        const userFilePath = path.join(__dirname, 'users.json');
-        fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
-        res.status(200).json({message: 'Successfully created user'});
-    }catch(err){
-        console.error("Error creating user: " + err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
+    // if(userModel[registerUsername]){
+    //     return res.status(409).json({error: "Username is already taken"});
+    // }
+    //
+    // for(const user of Object.values(userModel)) {
+    //     if(user.email === email){
+    //         return res.status(409).json({error: "Email already exists"});
+    //     }
+    // }
+    //
+    // if(registerPassword !== confirmPassword){
+    //     return res.status(401).json({error: "Password does not match"});
+    // }
+    //
+    //
+    // const hashedPassword = bcrypt.hashSync(registerPassword, 10);
+    //
+    // userModel[registerUsername] = {
+    //     username: registerUsername,
+    //     password: hashedPassword,
+    //     email: email
+    // }
+    //
+    //
+    // try{
+    //     const userFilePath = path.join(__dirname, 'users.json');
+    //     fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
+    //     res.status(200).json({message: 'Successfully created user'});
+    // }catch(err){
+    //     console.error("Error creating user: " + err);
+    //     res.status(500).json({error: "Internal Server Error"});
+    // }
 });
 
 //app.delete("/deleteAccount", function (req, res) {
@@ -168,10 +200,29 @@ app.post('/auth/discord', async (req, res) => {
 
         const discordUser = await me.json()
 
+       //
+        let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
+        let user = userResult.rows[0];
+
+        if(!user){
+            const insertQuery= `
+                INSERT INTO users (username, discord_id) 
+                VALUES ($1, $2) 
+                RETURNING *;
+            `;
+
+            const values = [discordUser.username, discordUser.id];
+            userResult = await db.query(insertQuery, values);
+            user = userResult.rows[0];
+            console.log("New Discord User saved in database:", user.username);
+        }else{
+            console.log("Known Discord User logged in:", user.username);
+        }
+
         //local session gets created with discord information
         req.session.user = {
-            id: discordUser.id,
-            username: discordUser.username,
+            id: user.id,
+            username: user.username,
             loginMethod: 'discord'
         };
 
