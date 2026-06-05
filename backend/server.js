@@ -2,21 +2,20 @@ const express = require('express');
 //node:path tells node.js to ignore the node_modules folder
 const path = require('node:path');
 const session = require("express-session");
-const bodyParser = require('body-parser');
-const userModel = require("./user-model.js");
 const config = require('./config');
 const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
-
+const connectDB = require('./db-connection.js');
+const {values} = require("pg/lib/native/query");
 const app = express();
-const memory = {}
-const fs = require('fs');
-
 
 // Parse urlencoded bodies
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../frontend')));
-
+let db;
+connectDB().then(client => {
+    db = client;
+});
 // Session middleware
 // instead of nodemon, use node server/server.js
 // maybe use helmet later on
@@ -49,21 +48,26 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/login.html'));
 });
 
-app.post("/login", function (req, res) {
+app.post("/login", async (req, res) => {
     const { username, password } = req.body;
-    //searches for user entry
-    const user = userModel[username];
-    //if the user was found and the entered password is correct create session for user
-    if (user && bcrypt.compareSync(password, user.password)) {
-        req.session.user = {
-            username,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            loginTime: new Date().toISOString(),
-        };
-        res.send(req.session.user);
-    } else {
-        res.sendStatus(401);
+    try{
+        const result = await db.query(`SELECT * FROM users WHERE username = $1`, [username]);
+        const user = result.rows[0];
+        if(user && bcrypt.compareSync(password, user.password_hash)) {
+            req.session.user = {
+                id: user.id,
+                username: user.username,
+                loginMethod: 'local',
+                loginTime: new Date().toISOString(),
+            };
+
+            res.status(200).json(req.session.user);
+        } else {
+            res.status(401).json({error: 'Invalid username or password'});
+        }
+    }catch(err){
+        console.error("Login error: " ,err);
+        res.status(500).json({error: 'Internal Server Error'});
     }
 });
 
@@ -90,41 +94,73 @@ app.get('/dashboard',requiredLogin, (req, res) => {
     }
 });
 
-app.post('/register', function (req, res) {
+//for later give error for Username or Email if User already exists
+app.post('/register', async (req, res) => {
     const {email, registerUsername, registerPassword, confirmPassword} = req.body;
 
-    if(userModel[registerUsername]){
-        return res.status(409).json({error: "Username is already taken"});
-    }
 
-    for(const user of Object.values(userModel)) {
-        if(user.email === email){
-            return res.status(409).json({error: "Email already exists"});
+    if(registerPassword !== confirmPassword) {
+        return res.status(401).send('Passwords don\'t match');
+    }
+    try{
+        //passwort verschlüsseln
+        const saltRounds = 10;
+        const password_hash = await bcrypt.hash(registerPassword, saltRounds);
+
+        const query = `
+            INSERT INTO users (username, email, password_hash) 
+            VALUES ($1, $2, $3) 
+            RETURNING id, username;
+        `;
+
+        const values = [registerUsername, email, password_hash];
+
+        const result = await db.query(query, values);
+
+        console.log("New User saved in database: ",result.rows[0]);
+        res.status(201).send("Registration successful");
+    }catch(err){
+        console.error("Error with registration", err);
+
+        if(err.code==="23505"){
+            res.status(401).json({error: "User already exists"});
+        }else{
+            res.status(500).json({error:"Internal Server Error"});
         }
     }
 
-    if(registerPassword !== confirmPassword){
-        return res.status(401).json({error: "Password does not match"});
-    }
-
-
-    const hashedPassword = bcrypt.hashSync(registerPassword, 10);
-
-    userModel[registerUsername] = {
-        username: registerUsername,
-        password: hashedPassword,
-        email: email
-    }
-
-
-    try{
-        const userFilePath = path.join(__dirname, 'users.json');
-        fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
-        res.status(200).json({message: 'Successfully created user'});
-    }catch(err){
-        console.error("Error creating user: " + err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
+    // if(userModel[registerUsername]){
+    //     return res.status(409).json({error: "Username is already taken"});
+    // }
+    //
+    // for(const user of Object.values(userModel)) {
+    //     if(user.email === email){
+    //         return res.status(409).json({error: "Email already exists"});
+    //     }
+    // }
+    //
+    // if(registerPassword !== confirmPassword){
+    //     return res.status(401).json({error: "Password does not match"});
+    // }
+    //
+    //
+    // const hashedPassword = bcrypt.hashSync(registerPassword, 10);
+    //
+    // userModel[registerUsername] = {
+    //     username: registerUsername,
+    //     password: hashedPassword,
+    //     email: email
+    // }
+    //
+    //
+    // try{
+    //     const userFilePath = path.join(__dirname, 'users.json');
+    //     fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
+    //     res.status(200).json({message: 'Successfully created user'});
+    // }catch(err){
+    //     console.error("Error creating user: " + err);
+    //     res.status(500).json({error: "Internal Server Error"});
+    // }
 });
 
 //app.delete("/deleteAccount", function (req, res) {
@@ -168,10 +204,29 @@ app.post('/auth/discord', async (req, res) => {
 
         const discordUser = await me.json()
 
+       //
+        let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
+        let user = userResult.rows[0];
+
+        if(!user){
+            const insertQuery= `
+                INSERT INTO users (username, discord_id) 
+                VALUES ($1, $2) 
+                RETURNING *;
+            `;
+
+            const values = [discordUser.username, discordUser.id];
+            userResult = await db.query(insertQuery, values);
+            user = userResult.rows[0];
+            console.log("New Discord User saved in database:", user.username);
+        }else{
+            console.log("Known Discord User logged in:", user.username);
+        }
+
         //local session gets created with discord information
         req.session.user = {
-            id: discordUser.id,
-            username: discordUser.username,
+            id: user.id,
+            username: user.username,
             loginMethod: 'discord'
         };
 
@@ -212,96 +267,107 @@ app.post('/auth/discord', async (req, res) => {
 //app.put('/api/groups:id')     Update group
 //app.delete('/api/groups/:id') Delete group
 
-//testGroup for endpoints, later in db
-let testGroups = [{
-        id: 1,
-        game: "Valorant",
-        description: "Looking for friends",
-        maxPlayers: 5,
-        currentPlayers: 3, //later depends on users in group
-        creator: "TestUser", //later username of creator
-        //only testdata later other things like tags, rank, usw...
-    },
-    {
-        id: 2,
-        game: "Minecraft",
-        description: "Chill vanilla",
-        maxPlayers: 10,
-        currentPlayers: 2,
-        creator: "TestUser2",
-    }
-];
-let nextGroupID = 3;
 
 //get groups
 //SELECT * FROM groups
-app.get("/groups", (req, res) => {
-    res.status(200).json(testGroups);
+app.get("/groups", async (req, res) => {
+    try{
+        const query = `
+            SELECT 
+                id, 
+                game, 
+                description, 
+                max_players, 
+                current_players, 
+                creator_username
+            FROM groups
+            ORDER BY id DESC;
+        `;
+        const result = await db.query(query);
+        res.status(200).json(result.rows);
+    }catch(err){
+        console.error("Error fetching groups from database:", err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
 });
 
 //create groups
-app.post("/groups", requiredLogin, (req, res) => {
-    const username = req.session.username;
-    const {game, description, maxPlayers} = req.body;
+app.post("/groups", requiredLogin, async (req, res) => {
+    const creator_username = req.session.user.username;
+    const {game, description, max_players} = req.body;
 
-    if(!game || !description || !maxPlayers){
-        return res.status(401).json({error: "Please fill out all the fields."});
+    if(!game || !description || !max_players){
+        return res.status(400).json({error: "Please fill out all the fields."});
     }
 
-    const newGroup = {
-        id: nextGroupID++,
-        game: game,
-        description: description,
-        maxPlayers: parseInt(maxPlayers),
-        currentPlayers: 1,
-        creator: username,
+    try{
+        const query = `
+        INSERT INTO groups (game, description, max_players, creator_username)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, game, description, max_players, current_players, creator_username
+        `;
+        const values = [game, description, parseInt(max_players), creator_username];
+        const result = await db.query(query, values);
+        res.status(200).json({success: true, group: result.rows[0]});
+    }catch (err){
+        console.error("Error creating group:", err);
+        res.status(500).json({error: "Internal Server Error"});
     }
-
-    //INSERT INTO groups
-    testGroups.push(newGroup);
-    //remember to ask if we want to change the whole website to the creat Party interface or only a pop up window (dialog or whatever it is called)
-    res.status(200).json({success: true});
 })
 
-app.delete("/groups/:id", requiredLogin, (req, res) => {
+app.delete("/groups/:id", requiredLogin, async (req, res) => {
     const groupId = parseInt(req.params.id);
-    const groupIndex = testGroups.findIndex(group => group.id === groupId);
+    const username = req.session.user.username;
 
-    if(groupIndex === -1) {
-        return res.status(404).json({error: "Group not found"});
-    }
-    const group = testGroups[groupIndex];
-    if(group.creator !== req.session.user.creator){
-        return res.status(401).json({error: "User not found"});
-    }
+    try{
+        const query = `
+            DELETE FROM groups 
+            WHERE id = $1 AND creator_username = $2 
+            RETURNING id;
+        `;
 
-    testGroups.splice(groupIndex, 1);
-    res.status(200).json({success: true, message: "Group deleted successfully."});
+        const values = [groupId, username];
+        const result = await db.query(query, values);
+
+        if(result.rowCout === 0){
+            return res.status(404).json({error: "Could not find group"});
+        }
+
+        res.status(200).json({success: true, message: "Group deleted successfully."});
+    }catch(err){
+        console.error("Error deleting group:", err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
 })
 
-app.put("/groups/:id", requiredLogin, (req, res) => {
+app.put("/groups/:id", requiredLogin, async (req, res) => {
     const groupId = parseInt(req.params.id, 10);
-    const {description, maxPlayers} = req.body;
-    const groupIndex = testGroups.findIndex(group => group.id === groupId);
+    const {game, description, max_players} = req.body;
+    const creator_username = req.session.user.username;
 
-    if(groupIndex === -1) {
-        return res.status(404).json({error: "Group not found"});
+    try{
+        const query = `
+            UPDATE groups 
+            SET 
+                game = COALESCE($1, game),
+                description = COALESCE($2, description),
+                max_players = COALESCE($3, max_players)
+            WHERE id = $4 AND creator_username = $5
+            RETURNING id, game, description, max_players, current_players, creator_username;
+        `;
+
+        const values = [game || null, description || null, max_players ? parseInt(max_players) : null, groupId, creator_username];
+        const result = await db.query(query, values);
+
+        if(result.rowCout === 0){
+            return res.status(404).json({error: "Could not find group"});
+        }
+
+        res.status(200).json({success: true, group: result.rows[0], message: "Group updated successfully."});
+    }catch(err){
+        console.error("Error update group:", err);
+        res.status(500).json({error: "Internal Server Error"});
     }
-
-    const group = testGroups[groupIndex];
-
-    if(group.creator !== req.session.user.creator){
-        return res.status(403).json({error: "You can only edit your own groups"});
-    }
-
-    if(description){
-        group.description = description;
-    }
-
-    if(maxPlayers){
-        group.maxPlayers = parseInt(maxPlayers);
-    }
-    res.status(200).json({success: true, group: group, message: "Group updated successfully."});
 })
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
