@@ -2,6 +2,31 @@
 //this is because
 let currentSession = null;
 
+//-----------------------------------------------Google Login Functions------------------------------------------------------------
+const checkGoogleLogin = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+
+    if (code && window.location.href.includes("localhost")) {
+        window.history.replaceState({}, document.title, "/");
+
+        try {
+            const response = await fetch("/auth/google", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code })
+            });
+
+            if (response.ok) {
+                location.replace("/dashboard");
+                return true;
+            }
+        } catch (err) {
+            console.error("Fehler bei der Google-Authentifizierung: " + err);
+        }
+    }
+    return false;
+}
 //-----------------------------------------------Discord Login Functions------------------------------------------------------------
 const checkDiscordLogin = async () => {
     const url = new URLSearchParams(window.location.search);
@@ -141,6 +166,9 @@ window.onload = async () => {
     const hasDiscordLogin = await checkDiscordLogin();
     //stops if true, if false goes to next
     if (hasDiscordLogin) return;
+
+    const hasGoogleLogin = await checkGoogleLogin();
+    if (hasGoogleLogin) return;
 
     //if no login worked, shows login screen
     const noLoginWorked = document.getElementById('login');

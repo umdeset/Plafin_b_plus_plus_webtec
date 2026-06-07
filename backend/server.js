@@ -167,6 +167,42 @@ app.post('/register', async (req, res) => {
 //    const {}
 //})
 
+//-----------------------------------------------------------FOR GOOGLE-------------------------------------------------------------------------------------
+app.post('/auth/google', async (req, res) => {
+    const { code } = req.body;
+
+    try {
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                client_id: config.GOOGLE_CLIENT_ID,
+                client_secret: config.GOOGLE_CLIENT_SECRET,
+                code: code,
+                grant_type: 'authorization_code',
+                redirect_uri: 'http://localhost:3000'
+            })
+        });
+
+        const tokenData = await tokenResponse.json();
+
+        const userResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${tokenData.access_token}` }
+        });
+        const googleUser = await userResponse.json();
+        let userResult = await db.query('SELECT * FROM users WHERE google_id = $1', [googleUser.sub]);
+        if (userResult.rows.length === 0) {
+            const insertQuery = 'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *';
+            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub]);
+        }
+        req.session.user = { id: userResult.rows[0].id, username: userResult.rows[0].username };
+        res.status(200).json({ success: true });
+
+    } catch (err) {
+        console.error("Fehler beim Google-Login:", err);
+        res.status(500).json({ error: "Google-Authentifizierung fehlgeschlagen" });
+    }
+});
 
 //-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
 //exchange code for access token
