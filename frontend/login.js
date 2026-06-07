@@ -8,8 +8,6 @@ const checkGoogleLogin = async () => {
     const code = urlParams.get("code");
 
     if (code && window.location.href.includes("localhost")) {
-        window.history.replaceState({}, document.title, "/");
-
         try {
             const response = await fetch("/auth/google", {
                 method: "POST",
@@ -18,6 +16,7 @@ const checkGoogleLogin = async () => {
             });
 
             if (response.ok) {
+                window.history.replaceState({}, document.title, "/");
                 location.replace("/dashboard");
                 return true;
             }
@@ -33,8 +32,6 @@ const checkDiscordLogin = async () => {
     const code = url.get("code");
     if (code) {
         //clean to not show any data
-        window.history.replaceState({}, document.title, "/");
-
         try{
             const response = await fetch("/auth/discord",{
                 method: "POST",
@@ -44,6 +41,7 @@ const checkDiscordLogin = async () => {
 
             if(response){
                 //i used replace so that if we use the browser's integrated go back button we do not go back to the login screen
+                window.history.replaceState({}, document.title, "/");
                 location.replace("/dashboard")
                 return true;
             }
@@ -162,13 +160,14 @@ window.onload = async () => {
     //stops if true, if false checks next
     if (hasSession) return;
 
+
+    const hasGoogleLogin = await checkGoogleLogin();
+    if (hasGoogleLogin) return;
+
     //Checks if logged in through discord and creates a session for him
     const hasDiscordLogin = await checkDiscordLogin();
     //stops if true, if false goes to next
     if (hasDiscordLogin) return;
-
-    const hasGoogleLogin = await checkGoogleLogin();
-    if (hasGoogleLogin) return;
 
     //if no login worked, shows login screen
     const noLoginWorked = document.getElementById('login');
