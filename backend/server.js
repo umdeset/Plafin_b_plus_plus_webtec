@@ -272,6 +272,7 @@ app.post('/auth/discord', async (req, res) => {
 //Now also can search for specific games
 app.get("/groups", async (req, res) => {
     const filterGame = req.query.game;
+    const filterTag = req.query.tags;
 
     try{
         let query = `
@@ -281,14 +282,29 @@ app.get("/groups", async (req, res) => {
                 description, 
                 max_players, 
                 current_players, 
-                creator_username
+                creator_username,
+                tags
             FROM groups
         `;
+        let filters = [];
         let values = [];
+
+        //gesucht nach Spiel
         if (filterGame) {
-            query += ` WHERE game = $1`;
-            values.push(filterGame)
+            values.push(filterGame);
+            filters.push(`game = $${values.length}`);
         }
+        //gesucht nach Tag
+        if(filterTag) {
+            values.push(`%${filterTag}%`);
+            filters.push(`tags ILIKE $${values.length}`);
+        }
+
+        //Wenn filter wird AND eingefügt
+        if(filters.length > 0){
+            query += ` WHERE ` + filters.join(' AND ');
+        }
+
         query += ` ORDER BY id DESC;`;
 
         const result = await db.query(query, values);
@@ -302,19 +318,21 @@ app.get("/groups", async (req, res) => {
 //create groups
 app.post("/groups", requiredLogin, async (req, res) => {
     const creator_username = req.session.user.username;
-    const {game, description, max_players} = req.body;
+    const {game, description, max_players, tags} = req.body;
 
     if(!game || !description || !max_players){
         return res.status(400).json({error: "Please fill out all the fields."});
     }
 
+    const safeTags = tags ? tags.trim() : "";
+
     try{
         const query = `
-        INSERT INTO groups (game, description, max_players, creator_username)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, game, description, max_players, current_players, creator_username
+        INSERT INTO groups (game, description, max_players, creator_username, tags)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, game, description, max_players, current_players, creator_username, tags
         `;
-        const values = [game, description, parseInt(max_players), creator_username];
+        const values = [game.trim(), description.trim(), parseInt(max_players), creator_username, safeTags];
         const result = await db.query(query, values);
         res.status(200).json({success: true, group: result.rows[0]});
     }catch (err){

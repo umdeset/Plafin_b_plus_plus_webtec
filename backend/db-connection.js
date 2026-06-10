@@ -30,6 +30,7 @@ async function connectDB() {
                 max_players INTEGER NOT NULL,
                 current_players INTEGER DEFAULT 1,
                 creator_username VARCHAR(255) NOT NULL,
+                tags VARCHAR(255) DEFAULT '', -- Für Leute, die die DB in Zukunft komplett neu aufsetzen
                 FOREIGN KEY (creator_username) REFERENCES users(username) ON DELETE CASCADE
             );
         `);
