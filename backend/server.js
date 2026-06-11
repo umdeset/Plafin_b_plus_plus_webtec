@@ -16,7 +16,7 @@ let db;
 connectDB().then(client => {
     db = client;
 });
-// Session middleware
+// Session middeware
 // instead of nodemon, use node server/server.js
 // maybe use helmet later on
 app.use(session({
@@ -190,7 +190,16 @@ app.post('/auth/google', async (req, res) => {
             headers: { Authorization: `Bearer ${tokenData.access_token}` }
         });
         const googleUser = await userResponse.json();
+        const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [googleUser.email]);
+
+        if (existingUser.rows.length > 0) {
+            // falls der user existiert aber noch keine google_id hat wissen wir dass er sich über die webseite schonmal registriert hat
+            if (!existingUser.rows[0].google_id) {
+                return res.status(409).json({ error: "Diese E-Mail ist bereits mit einem Plafin Account verknüpft. Bitte logge dich mit deinem Passwort ein." });
+            }
+        }
         let userResult = await db.query('SELECT * FROM users WHERE google_id = $1', [googleUser.sub]);
+
         if (userResult.rows.length === 0) {
             const insertQuery = 'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *';
             userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub]);

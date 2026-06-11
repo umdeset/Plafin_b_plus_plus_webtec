@@ -3,16 +3,18 @@
 let currentSession = null;
 
 //-----------------------------------------------Google Login Functions------------------------------------------------------------
-const checkGoogleLogin = async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
+const checkDiscordAndGoogleLogin = async (provider) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
 
-    if (code && window.location.href.includes("localhost")) {
+        if (!code) return false;
+
         try {
-            const response = await fetch("/auth/google", {
+            const response = await fetch(`/auth/${provider}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ code })
+
             });
 
             if (response.ok) {
@@ -21,36 +23,10 @@ const checkGoogleLogin = async () => {
                 return true;
             }
         } catch (err) {
-            console.error("Fehler bei der Google-Authentifizierung: " + err);
+            console.error(`Fehler bei der ${provider}-Authentifizierung:`, err);
         }
+        return false;
     }
-    return false;
-}
-//-----------------------------------------------Discord Login Functions------------------------------------------------------------
-const checkDiscordLogin = async () => {
-    const url = new URLSearchParams(window.location.search);
-    const code = url.get("code");
-    if (code) {
-        //clean to not show any data
-        try{
-            const response = await fetch("/auth/discord",{
-                method: "POST",
-                headers: {"Content-type": "application/json"},
-                body: JSON.stringify({code})
-            });
-
-            if(response){
-                //i used replace so that if we use the browser's integrated go back button we do not go back to the login screen
-                window.history.replaceState({}, document.title, "/");
-                location.replace("/dashboard")
-                return true;
-            }
-        }catch(err){
-            console.error("Failed to authenticate with Discord: " + err);
-        }
-    }
-    return false;
-}
 
 //-----------------------------------------------Normal Session Functions------------------------------------------------------------
 const checkNormalSession = async () => {
@@ -161,15 +137,15 @@ window.onload = async () => {
     if (hasSession) return;
 
 
-    const hasGoogleLogin = await checkGoogleLogin();
-    if (hasGoogleLogin) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
 
-    //Checks if logged in through discord and creates a session for him
-    const hasDiscordLogin = await checkDiscordLogin();
-    //stops if true, if false goes to next
-    if (hasDiscordLogin) return;
+    if (code) {
+        // versuchen discord, wenn das nicht geht versuchen wir google
+        if (await checkDiscordAndGoogleLogin('discord')) return;
+        if (await checkDiscordAndGoogleLogin('google')) return;
+    }
 
-    //if no login worked, shows login screen
     const noLoginWorked = document.getElementById('login');
     if (noLoginWorked) {
         noLoginWorked.style.display = 'block';
