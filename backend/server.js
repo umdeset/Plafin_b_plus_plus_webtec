@@ -6,7 +6,6 @@ const config = require('./config');
 const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
 const connectDB = require('./db-connection.js');
-const {values} = require("pg/lib/native/query");
 const app = express();
 
 // Parse urlencoded bodies
@@ -233,7 +232,7 @@ app.post('/auth/discord', async (req, res) => {
         res.status(200).json({success: true})
    }catch(err){
        console.error("Discord Auth failed: " + err);
-       res.sendStatus(500).json({error: "Internal Server Error during Discord authentication"});
+       res.status(500).json({error: "Internal Server Error during Discord authentication"});
    }
 });
 
@@ -270,20 +269,45 @@ app.post('/auth/discord', async (req, res) => {
 
 //get groups
 //SELECT * FROM groups
+//Now also can search for specific games
 app.get("/groups", async (req, res) => {
+    const filterGame = req.query.game;
+    const filterTag = req.query.tags;
+
     try{
-        const query = `
+        let query = `
             SELECT 
                 id, 
                 game, 
                 description, 
                 max_players, 
                 current_players, 
-                creator_username
+                creator_username,
+                tags
             FROM groups
-            ORDER BY id DESC;
         `;
-        const result = await db.query(query);
+        let filters = [];
+        let values = [];
+
+        //gesucht nach Spiel
+        if (filterGame) {
+            values.push(filterGame);
+            filters.push(`game = $${values.length}`);
+        }
+        //gesucht nach Tag
+        if(filterTag) {
+            values.push(`%${filterTag}%`);
+            filters.push(`tags ILIKE $${values.length}`);
+        }
+
+        //Wenn filter wird AND eingefügt
+        if(filters.length > 0){
+            query += ` WHERE ` + filters.join(' AND ');
+        }
+
+        query += ` ORDER BY id DESC;`;
+
+        const result = await db.query(query, values);
         res.status(200).json(result.rows);
     }catch(err){
         console.error("Error fetching groups from database:", err);
@@ -294,19 +318,21 @@ app.get("/groups", async (req, res) => {
 //create groups
 app.post("/groups", requiredLogin, async (req, res) => {
     const creator_username = req.session.user.username;
-    const {game, description, max_players} = req.body;
+    const {game, description, max_players, tags} = req.body;
 
     if(!game || !description || !max_players){
         return res.status(400).json({error: "Please fill out all the fields."});
     }
 
+    const safeTags = tags ? tags.trim() : "";
+
     try{
         const query = `
-        INSERT INTO groups (game, description, max_players, creator_username)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, game, description, max_players, current_players, creator_username
+        INSERT INTO groups (game, description, max_players, creator_username, tags)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, game, description, max_players, current_players, creator_username, tags
         `;
-        const values = [game, description, parseInt(max_players), creator_username];
+        const values = [game.trim(), description.trim(), parseInt(max_players), creator_username, safeTags];
         const result = await db.query(query, values);
         res.status(200).json({success: true, group: result.rows[0]});
     }catch (err){
@@ -329,7 +355,7 @@ app.delete("/groups/:id", requiredLogin, async (req, res) => {
         const values = [groupId, username];
         const result = await db.query(query, values);
 
-        if(result.rowCout === 0){
+        if(result.rowCount === 0){
             return res.status(404).json({error: "Could not find group"});
         }
 
@@ -359,7 +385,7 @@ app.put("/groups/:id", requiredLogin, async (req, res) => {
         const values = [game || null, description || null, max_players ? parseInt(max_players) : null, groupId, creator_username];
         const result = await db.query(query, values);
 
-        if(result.rowCout === 0){
+        if(result.rowCount === 0){
             return res.status(404).json({error: "Could not find group"});
         }
 
@@ -369,6 +395,39 @@ app.put("/groups/:id", requiredLogin, async (req, res) => {
         res.status(500).json({error: "Internal Server Error"});
     }
 })
+
+app.post("/groups/:id/join", requiredLogin, async (req, res) => {
+    const groupId = parseInt(req.params.id, 10);
+
+    try{
+        const result = await db.query('SELECT * FROM groups WHERE id = $1', [groupId]);
+        const group = result.rows[0];
+
+        if(!group){
+            return res.status(404).json({error: "Could not find group"});
+        }
+
+        if(group.current_players >= group.max_players){
+            return res.status(400).json({error: "Group is full!"});
+        }
+
+        const query = `
+            UPDATE groups 
+            SET current_players = current_players + 1
+            WHERE id = $1
+            RETURNING id, game, description, max_players, current_players;
+        `;
+
+        const updatedGroup = await db.query(query, [group.id]);
+
+        res.status(200).json({success: true, message: "You successfully joined the group!", group: updatedGroup.rows[0]});
+
+    }catch(err){
+        console.error("Error joining group:", err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
+})
+
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
 });
