@@ -2,11 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
-    <script src="dashboard.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plafin - Dashboard</title>
+    <link href="dashboard.css" rel="stylesheet">
+    <script src="dashboard.js" defer></script>
 </head>
 <body>
-    <p id="info">Hi</p>
-    <button type="button" id="logoutBtn">Logout</button>
+<div class="sidebar">
+    <div class="logo">PLAFIN</div>
+
+    <div class="menu">
+        <button class="nav-btn active">
+            <span class="icon icon-grid"></span>
+        </button>
+
+        <button class="nav-btn">
+            <span class="icon icon-controller"></span>
+        </button>
+    </div>
+
+    <button id="logoutBtn" class="logout-btn">
+        <span class="icon icon-logout"></span>
+    </button>
+</div>
+
+<div class="main-content">
+    <header>
+        <h1 id="info">Game Selection</h1>
+        <div class="header-icons">
+
+            <span class="icon icon-settings icon-hover"></span>
+
+            <div class="user-profile">
+                <span class="icon icon-profile icon-hover" style="width: 32px; height: 32px;"></span>
+            </div>
+
+        </div>
+    </header>
+
+    <div class="game-grid" id="gameGrid">
+    </div>
+</div>
+
 </body>
 </html>

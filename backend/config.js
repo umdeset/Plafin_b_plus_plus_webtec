@@ -7,6 +7,5 @@ module.exports = {
     discord_Client_ID: process.env.DISCORD_CLIENT_ID || '',
     discord_Client_Secret: process.env.DISCORD_CLIENT_SECRET || 'your-secret-key',
     JWT_SECRET: process.env.JWT_SECRET || 'JWT-secretkey',
-    omdbTimeoutMs: 5000, // 5 second timeout for external API calls
     postgresURI: process.env.POSTGRES_URI
 };
