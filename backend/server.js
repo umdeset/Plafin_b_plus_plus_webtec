@@ -315,6 +315,28 @@ app.get("/groups", async (req, res) => {
     }
 });
 
+//Get Games endpoint für erstansicht der Gruppen am dashboard
+app.get("/games/load", async (req, res) => {
+    try{
+        const query = `
+        SELECT
+            game,
+            COUNT(id) AS active_lobbies,
+            SUM(current_players) AS players_online,
+            MAX(image_url) AS image_url
+        FROM groups
+        GROUP BY game
+        ORDER BY active_lobbies DESC;
+        `;
+
+        const result = await db.query(query);
+        res.status(200).json(result.rows);
+    }catch(err){
+        console.error("Error fetching groups from database:", err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
+})
+
 //create groups
 app.post("/groups", requiredLogin, async (req, res) => {
     const creator_username = req.session.user.username;
@@ -326,13 +348,23 @@ app.post("/groups", requiredLogin, async (req, res) => {
 
     const safeTags = tags ? tags.trim() : "";
 
+    const checkGame = await db.query('SELECT image_url FROM games WHERE name = $1', [game.trim()]);
+
+    if (checkGame.rowCount === 0) {
+        return res.status(400).json({
+            error: "This game does not exist yet"
+        })
+    }
+
+    const imageUrl = checkGame.rows[0].image_url;
+
     try{
         const query = `
-        INSERT INTO groups (game, description, max_players, creator_username, tags)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, game, description, max_players, current_players, creator_username, tags
+        INSERT INTO groups (game, description, max_players, creator_username, tags, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, game, description, max_players, current_players, creator_username, tags, image_url
         `;
-        const values = [game.trim(), description.trim(), parseInt(max_players), creator_username, safeTags];
+        const values = [game.trim(), description.trim(), parseInt(max_players), creator_username, safeTags, imageUrl];
         const result = await db.query(query, values);
         res.status(200).json({success: true, group: result.rows[0]});
     }catch (err){
@@ -424,6 +456,60 @@ app.post("/groups/:id/join", requiredLogin, async (req, res) => {
 
     }catch(err){
         console.error("Error joining group:", err);
+        res.status(500).json({error: "Internal Server Error"});
+    }
+})
+
+app.get("/games/search", requiredLogin, async (req, res) => {
+    const searchQuery = req.query.q;
+    if(!searchQuery || searchQuery.trim() === ""){
+        return res.status(404).json({error: "Please enter a valid search query."});
+    }
+
+    const searchTerm = searchQuery.trim();
+
+    try{
+        //nachschauen ob das game schon in der db ist
+        const localSearch = await db.query('SELECT name, image_url FROM games WHERE name ILIKE $1 LIMIT 5', [`%${searchTerm}%`]);
+
+        if(localSearch.rowCount > 0){
+            console.log(`Game Found in db: ${searchTerm}`);
+            return res.status(200).json(localSearch.rows);
+        }
+
+        //request RAWG API nach game
+        console.log(`Game not found in db, request from RAWG API: ${searchTerm}...`);
+        const response = await fetch(`https://api.rawg.io/api/games?search=${encodeURIComponent(searchTerm)}&key=${config.RAWG_API_KEY}`);
+
+        if(!response.ok){
+            return res.status(500).json({error: "Error fetching data from RAWG API"});
+        }
+
+        const data = await response.json();
+
+        if(!data.results || data.results.length === 0){
+            return res.status(404).json({error: "Could not find a game by that name"});
+        }
+
+        //besten 3 ergebnise
+        const topGames = data.results.slice(0, 3);
+        const savedGames = [];
+
+        //Speichert bilder in db, wenn kein Bild gefunden wurde speichert es ein placeholder Bild
+        for (const game of topGames){
+            const img = game.background_image || "https://images.gostudent.org/user/avatar/eb378dcb-1c80-40af-b796-eb3ffa6a592b/400/400/image.png";
+
+            const addQuery = `
+                INSERT INTO games (name, image_url)
+                VALUES ($1, $2)
+                ON CONFLICT (name) DO NOTHING;
+            `;
+            await db.query(addQuery, [game.name, img]);
+            savedGames.push({name: game.name, image_url: img});
+        }
+        return res.status(200).json(savedGames);
+    }catch(err){
+        console.error("Error fetching data from RAWG API", err);
         res.status(500).json({error: "Internal Server Error"});
     }
 })
