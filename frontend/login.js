@@ -17,11 +17,22 @@ const checkDiscordAndGoogleLogin = async (provider) => {
 
             });
 
-            if (response.ok) {
+            //zuerst fehler status abfragen dann alert schicken und url reinigen
+            if (response.status === 409){
+                const errorData = await response.json();
+                alert(errorData.error);
                 window.history.replaceState({}, document.title, "/");
-                location.replace("/dashboard");
-                return true;
             }
+
+            //falls anderer fehler aufgetaucht ist sofort fehler thrown
+            if(!response.ok){
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            window.history.replaceState({}, document.title, "/");
+            location.replace("/dashboard");
+            return true;
+
         } catch (err) {
             console.error(`Fehler bei der ${provider}-Authentifizierung:`, err);
         }

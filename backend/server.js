@@ -191,7 +191,6 @@ app.post('/auth/google', async (req, res) => {
         });
         const googleUser = await userResponse.json();
         const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [googleUser.email]);
-
         if (existingUser.rows.length > 0) {
             // falls der user existiert aber noch keine google_id hat wissen wir dass er sich über die webseite schonmal registriert hat
             if (!existingUser.rows[0].google_id) {
@@ -236,7 +235,6 @@ app.post('/auth/discord', async (req, res) => {
         const oAuthData = await tokenResponseData.json();
 
         if(!oAuthData.access_token) {
-            console.log("Discord Error: " + oAuthData);
             return res.status(400).json({error: "Could not get Discord token"});
         }
 
