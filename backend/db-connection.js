@@ -30,8 +30,14 @@ async function connectDB() {
                 max_players INTEGER NOT NULL,
                 current_players INTEGER DEFAULT 1,
                 creator_username VARCHAR(255) NOT NULL,
-                tags VARCHAR(255) DEFAULT '', -- Für Leute, die die DB in Zukunft komplett neu aufsetzen
+                tags VARCHAR(255) DEFAULT '',
+                image_url VARCHAR(500),
                 FOREIGN KEY (creator_username) REFERENCES users(username) ON DELETE CASCADE
+            );
+            CREATE TABLE IF NOT EXISTS games (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL UNIQUE,
+                image_url VARCHAR(500)
             );
         `);
         console.log('Database Ready');
