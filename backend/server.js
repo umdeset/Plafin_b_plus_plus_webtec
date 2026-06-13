@@ -278,7 +278,8 @@ app.get("/groups", async (req, res) => {
         let query = `
             SELECT 
                 id, 
-                game, 
+                game,
+                title, 
                 description, 
                 max_players, 
                 current_players, 
@@ -340,7 +341,7 @@ app.get("/games/load", async (req, res) => {
 //create groups
 app.post("/groups", requiredLogin, async (req, res) => {
     const creator_username = req.session.user.username;
-    const {game, description, max_players, tags} = req.body;
+    const {game, title, description, max_players, tags} = req.body;
 
     if(!game || !description || !max_players){
         return res.status(400).json({error: "Please fill out all the fields."});
@@ -360,11 +361,11 @@ app.post("/groups", requiredLogin, async (req, res) => {
 
     try{
         const query = `
-        INSERT INTO groups (game, description, max_players, creator_username, tags, image_url)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, game, description, max_players, current_players, creator_username, tags, image_url
+        INSERT INTO groups (game, title, description, max_players, creator_username, tags, image_url)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, title, game, description, max_players, current_players, creator_username, tags, image_url
         `;
-        const values = [game.trim(), description.trim(), parseInt(max_players), creator_username, safeTags, imageUrl];
+        const values = [game.trim(), title.trim(), description.trim(), parseInt(max_players), creator_username, safeTags, imageUrl];
         const result = await db.query(query, values);
         res.status(200).json({success: true, group: result.rows[0]});
     }catch (err){

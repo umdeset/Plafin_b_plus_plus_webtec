@@ -25,7 +25,7 @@ function renderGames() {
     // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
     games.forEach(game => {
         html += `
-            <div class="game-card">
+            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(game.name)}'">
                 <img src="${game.img}" alt="${game.name}">
                 <div class="game-info">
                     <h3>${game.name}</h3>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plafin - Lobbies</title>
+    <link href="dashboard.css" rel="stylesheet">
+    <link href="lobbies.css" rel="stylesheet">
+    <script src="lobbies.js" defer></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">PLAFIN</div>
+
+  <div class="menu">
+    <a href="/dashboard" class="nav-btn">
+      <span class="icon icon-grid"></span>
+    </a>
+
+    <button class="nav-btn active">
+      <span class="icon icon-controller"></span>
+    </button>
+  </div>
+
+  <button id="logoutBtn" class="logout-btn">
+    <span class="icon icon-logout"></span>
+  </button>
+</div>
+
+<div class="main-content">
+  <header>
+    <h1 id="info">Lobbies</h1>
+    <div class="header-icons">
+      <span class="icon icon-settings icon-hover"></span>
+      <div class="user-profile">
+        <span class="icon icon-profile icon-hover" style="width: 32px; height: 32px;"></span>
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </div>
+    </div>
+  </header>
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>GAME</label>
+      <select id="gameFilter">
+        <option value="ALL">ALL GAMES</option>
+        <option value="Minecraft">MINECRAFT</option>
+        <option value="Grand Theft Auto V">GTA5</option>
+        <option value="Apex Legends">APEX LEGENDS</option>
+        <option value="Counter Strike 2">COUNTER STRIKE 2</option>
+        <option value="Fortnite">FORTNITE</option>
+        <option value="Rainbow 6 Siege">RAINBOW 6 SIEGE</option>
+        <option value="League of Legends">LEAGUE OF LEGENDS</option>
+        <option value="World of Warcraft">WORLD OF WARCRAFT</option>
+        <option value="Valorant">VALORANT</option>
+        <option value="Ark Survival">ARK SURVIVAL</option>
+        <option value="Chess.com">CHESS.COM</option>
+        <option value="Call of Duty: Black Ops 6">COD: BO6</option>
+        <option value="Roblox">ROBLOX</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>MODE</label>
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-mode="Casual">Casual</button>
+        <button class="toggle-btn" data-mode="Ranked">Ranked</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>MICROPHONE</label>
+      <div class="radio-group">
+        <label><input type="radio" name="mic" value="Required"> Required</label>
+        <label><input type="radio" name="mic" value="Optional" checked> Optional</label>
+      </div>
+    </div>
+
+    <button class="btn-create-lobby">Create Lobby</button>
+  </div>
+
+  <div class="lobby-grid" id="lobbyGrid">
+  </div>
+
+</div>
+
+<div id="createModal" class="modal-overlay" style="display: none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>Create your lobby</h2>
+      <button id="closeModal" class="close-modal-btn">&times;</button>
+    </div>
+
+    <form id="createLobbyForm">
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Select Game</label>
+          <select id="modalGame" required>
+            <option value="Minecraft">MINECRAFT</option>
+            <option value="Grand Theft Auto V">GTA5</option>
+            <option value="Apex Legends">APEX LEGENDS</option>
+            <option value="Valorant">VALORANT</option>
+          </select>
+        </div>
+        <div class="form-group half">
+          <label>Select Mode</label>
+          <select id="modalMode" required>
+            <option value="Casual">Casual</option>
+            <option value="Ranked">Ranked</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>MAX Players</label>
+        <div class="player-counter">
+          <button type="button" id="btnMinus">-</button>
+          <input type="number" id="modalMaxPlayers" value="5" min="2" max="64" readonly>
+          <button type="button" id="btnPlus">+</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Tags</label>
+        <div class="tags-row">
+          <label class="radio-label"><input type="radio" name="modalMic" value="Required"> Mic Required</label>
+          <label class="radio-label"><input type="radio" name="modalMic" value="Optional" checked> Mic Optional</label>
+          <input type="text" id="modalCustomTags" placeholder="Add Tag (e.g. No Toxic)" class="add-tag-input">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Lobby Header</label>
+        <input type="text" id="modalTitle" placeholder="Header" required>
+      </div>
+
+      <div class="form-group">
+        <label>Lobby Description</label>
+        <textarea id="modalDesc" placeholder="Looking for someone to play a casual survival world together. No pressure, just fun." rows="3" required></textarea>
+      </div>
+
+      <button type="submit" class="btn-create-submit">Create Lobby</button>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>

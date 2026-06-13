@@ -26,6 +26,7 @@ async function connectDB() {
             CREATE TABLE IF NOT EXISTS groups (
                 id SERIAL PRIMARY KEY,
                 game VARCHAR(255) NOT NULL,
+                title VARCHAR(255) DEFAULT 'Gaming Lounge',
                 description TEXT NOT NULL,
                 max_players INTEGER NOT NULL,
                 current_players INTEGER DEFAULT 1,
