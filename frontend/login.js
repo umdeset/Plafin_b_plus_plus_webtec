@@ -2,32 +2,42 @@
 //this is because
 let currentSession = null;
 
-//-----------------------------------------------Discord Login Functions------------------------------------------------------------
-const checkDiscordLogin = async () => {
-    const url = new URLSearchParams(window.location.search);
-    const code = url.get("code");
-    if (code) {
-        //clean to not show any data
-        window.history.replaceState({}, document.title, "/");
+//-----------------------------------------------Google Login Functions------------------------------------------------------------
+const checkDiscordAndGoogleLogin = async (provider) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get("code");
 
-        try{
-            const response = await fetch("/auth/discord",{
+        if (!code) return false;
+
+        try {
+            const response = await fetch(`/auth/${provider}`, {
                 method: "POST",
-                headers: {"Content-type": "application/json"},
-                body: JSON.stringify({code})
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code })
+
             });
 
-            if(response){
-                //i used replace so that if we use the browser's integrated go back button we do not go back to the login screen
-                location.replace("/dashboard")
-                return true;
+            //zuerst fehler status abfragen dann alert schicken und url reinigen
+            if (response.status === 409){
+                const errorData = await response.json();
+                alert(errorData.error);
+                window.history.replaceState({}, document.title, "/");
             }
-        }catch(err){
-            console.error("Failed to authenticate with Discord: " + err);
+
+            //falls anderer fehler aufgetaucht ist sofort fehler thrown
+            if(!response.ok){
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            window.history.replaceState({}, document.title, "/");
+            location.replace("/dashboard");
+            return true;
+
+        } catch (err) {
+            console.error(`Fehler bei der ${provider}-Authentifizierung:`, err);
         }
+        return false;
     }
-    return false;
-}
 
 //-----------------------------------------------Normal Session Functions------------------------------------------------------------
 const checkNormalSession = async () => {
@@ -137,12 +147,16 @@ window.onload = async () => {
     //stops if true, if false checks next
     if (hasSession) return;
 
-    //Checks if logged in through discord and creates a session for him
-    const hasDiscordLogin = await checkDiscordLogin();
-    //stops if true, if false goes to next
-    if (hasDiscordLogin) return;
 
-    //if no login worked, shows login screen
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+
+    if (code) {
+        // versuchen discord, wenn das nicht geht versuchen wir google
+        if (await checkDiscordAndGoogleLogin('discord')) return;
+        if (await checkDiscordAndGoogleLogin('google')) return;
+    }
+
     const noLoginWorked = document.getElementById('login');
     if (noLoginWorked) {
         noLoginWorked.style.display = 'block';

@@ -95,6 +95,16 @@ body {
 
 .btn-discord:hover { background-color: #4752C4; }
 
+.btn-google {
+    background-color: #DB4437;
+    color: white;
+    margin-top: 10px;
+}
+
+.btn-google:hover {
+    background-color: #c23321;
+}
+
 .divider {
     margin: 20px 0;
     font-size: 12px;
