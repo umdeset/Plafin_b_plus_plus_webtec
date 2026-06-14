@@ -33,7 +33,7 @@ async function connectDB() {
                 creator_username VARCHAR(255) NOT NULL,
                 tags VARCHAR(255) DEFAULT '',
                 image_url VARCHAR(500),
-                FOREIGN KEY (creator_username) REFERENCES users(username) ON DELETE CASCADE
+                FOREIGN KEY (creator_username) REFERENCES users(username) ON DELETE CASCADE ON UPDATE CASCADE
             );
             CREATE TABLE IF NOT EXISTS games (
                 id SERIAL PRIMARY KEY,
@@ -47,6 +47,9 @@ async function connectDB() {
                 PRIMARY KEY (group_id, user_id)
             );
         `);
+        await client.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_username_change TIMESTAMP;
+`);
         console.log('Database Ready');
         return client;
     }catch(err){

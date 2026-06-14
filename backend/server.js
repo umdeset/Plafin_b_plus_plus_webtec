@@ -630,6 +630,77 @@ app.get("/groups/:id/members", requiredLogin, async (req, res) => {
     }
 })
 
+app.delete("/deleteAccount", requiredLogin, async (req, res) => {
+    const userId = req.session.user.id;
+    try {
+        await db.query('DELETE FROM users WHERE id = $1', [userId]);
+        req.session.destroy();
+        res.status(200).json({ success: true, message: "Account deleted" });
+    } catch (err) {
+        console.error("Error deleting account:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+app.post("/changePassword", requiredLogin, async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.session.user.id;
+
+    try {
+        const userRes = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0];
+
+        const match = await bcrypt.compare(oldPassword, user.password_hash);
+        if (!match) return res.status(401).json({ error: "Wrong password lil bro." });
+        const newHash = await bcrypt.hash(newPassword, 10);
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+        res.status(200).json({ success: true, message: "Password updated." });
+    } catch (err) {
+        res.status(500).json({ error: "Fehler beim Passwort-Ändern." });
+    }
+});
+
+app.post("/changeUsername", requiredLogin, async (req, res) => {
+    // 1. Nur lokale Accounts dürfen ändern
+    if (req.session.user.loginMethod !== 'local') {
+        return res.status(403).json({ error: "Nice try, but not you." });
+    }
+
+    const { newUsername } = req.body;
+    const userId = req.session.user.id;
+    const oldUsername = req.session.user.username;
+
+    try {
+        // 2. Cooldown prüfen
+        const result = await db.query('SELECT last_username_change FROM users WHERE id = $1', [userId]);
+        const lastChange = result.rows[0].last_username_change;
+
+        if (lastChange) {
+            const timeDiff = new Date() - new Date(lastChange);
+            if (timeDiff < 24 * 60 * 60 * 1000) {
+                return res.status(429).json({ error: "Once a day, you gotta wait." });
+            }
+        }
+
+
+        await db.query('BEGIN');
+
+        await db.query('UPDATE groups SET creator_username = $1 WHERE creator_username = $2', [newUsername, oldUsername]);
+        await db.query('UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2', [newUsername, userId]);
+
+        await db.query('COMMIT');
+
+        // 4. Session aktualisieren
+        req.session.user.username = newUsername;
+        res.status(200).json({ success: true });
+
+    } catch (err) {
+        await db.query('ROLLBACK');
+        console.error("Fehler beim Username ändern:", err);
+        res.status(500).json({ error: "Interner Server Fehler" });
+    }
+});
+
 app.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
 });

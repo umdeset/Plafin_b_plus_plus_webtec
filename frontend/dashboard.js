@@ -1,23 +1,14 @@
 let currentSession = null;
 
-
-// Diese Funktion rendert die Spiele-Karten dynamisch ins HTML
-const renderGames = async ()  => {
+// Spiele rendern
+const renderGames = async () => {
     const grid = document.getElementById('gameGrid');
-    if (!grid) return;   // Bricht ab, falls wir nicht auf dem Dashboard sind
-
-    try{
+    if (!grid) return;
+    try {
         const response = await fetch('/games/load');
-
-        if(!response.ok){
-            const errorData = await response.json();
-            throw new Error(errorData.error);
-        }
-
+        if (!response.ok) throw new Error("Fehler beim Laden der Spiele");
         const gameData = await response.json();
-
         let html = '';
-        // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
         gameData.forEach(g => {
             html += `
             <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.name)}'">
@@ -29,54 +20,121 @@ const renderGames = async ()  => {
                         <p><span class="dot"></span>${g.active_lobbies} Active Lobbies</p>
                     </div>
                 </div>
-            </div>
-        `;
+            </div>`;
         });
-        // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
         grid.innerHTML = html;
-    }catch (err){
+    } catch (err) {
         console.error(err);
     }
-}
-
-
+};
 
 window.onload = async () => {
-    // Rendert sofort die Spiele, wenn die Seite lädt
     renderGames();
 
-    const logoutBtn = document.getElementById('logoutBtn');
-
-    //checks if user is logged in and shows a welcome message
-    try{
+    // Session prüfen
+    try {
         const response = await fetch('/session');
-        if (!response.ok) {
-            window.location.href='/';
-            return;
-        }
-        const userData = await response.json();
-        currentSession = userData;
-        document.getElementById('info').innerText = "Welcome : " + userData.username + " !";
-    }catch(err){
-        console.error("Error getting session data: ", err);
-        window.location.href='/';
+        if (!response.ok) { window.location.href = '/'; return; }
+        currentSession = await response.json();
+        document.getElementById('info').innerText = "Welcome : " + currentSession.username + " !";
+    } catch (err) {
+        window.location.href = '/';
     }
 
+    // Logout
+    const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        //asynch because it needs to wait for the response
         logoutBtn.addEventListener('click', async () => {
-            try{
-                const response = await fetch("/logout");
-                if(response.ok){
-                    currentSession = null;
-                    location.replace('/')
-                }else{
-                    console.error("Logout denied")
-                }
-            }catch(err){
-                console.error("Logout Failed:  ", err);
+            await fetch("/logout");
+            location.replace('/');
+        });
+    }
+
+    // --- Settings Modal Logik ---
+    const settingsIcon = document.querySelector('.icon-settings');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeBtn = document.getElementById('closeModalBtn');
+
+    if (settingsIcon) settingsIcon.addEventListener('click', () => settingsModal.style.display = 'flex');
+    if (closeBtn) closeBtn.addEventListener('click', () => settingsModal.style.display = 'none');
+
+    // --- Ansichtswechsel ---
+    document.getElementById('changePasswordViewBtn').addEventListener('click', () => {
+        document.getElementById('settingsDefaultView').style.display = 'none';
+        document.getElementById('settingsPasswordView').style.display = 'block';
+    });
+
+    document.getElementById('changeUsernameViewBtn').addEventListener('click', () => {
+        document.getElementById('settingsDefaultView').style.display = 'none';
+        document.getElementById('settingsUsernameView').style.display = 'block';
+    });
+
+    document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+        if (!confirm("there is no back, think twice.")) return;
+        const response = await fetch('/deleteAccount', { method: 'DELETE' });
+        if (response.ok) { location.replace('/'); } else { alert("error at delete."); }
+    });
+
+    document.getElementById('savePasswordBtn').addEventListener('click', async () => {
+        const oldPassword = document.getElementById('oldPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+        if (newPassword !== confirmNewPassword) return alert("Not the same password amk!");
+
+        const response = await fetch('/changePassword', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert("Passwort changed successfully!");
+            document.getElementById('settingsPasswordView').style.display = 'none';
+            document.getElementById('settingsDefaultView').style.display = 'block';
+        } else {
+            alert(result.error);
+        }
+    });
+
+    const usernameSettingsSection = document.getElementById('usernameSettingsSection');
+    const usernameChangeBtn = document.getElementById('changeUsernameViewBtn');
+    const passwordSection = document.getElementById('passwordSettingsSection');
+    const usernameSection = document.getElementById('usernameSettingsSection');
+
+// auführen wenn die elemente auch wirklich existieren
+    if (passwordSection && usernameSection) {
+        if (currentSession && currentSession.loginMethod === 'local') {
+            // Lokaler User: Alles anzeigen
+            passwordSection.style.display = 'block';
+            usernameSection.style.display = 'block';
+        } else {
+            // Google/Discord User: Alles ausblenden
+            passwordSection.style.display = 'none';
+            usernameSection.style.display = 'none';
+        }
+    }
+
+// listener für speichern
+    const saveUsernameBtn = document.getElementById('saveUsernameBtn');
+    if (saveUsernameBtn) {
+        saveUsernameBtn.addEventListener('click', async () => {
+            const newUsername = document.getElementById('newUsernameInput').value;
+            if (!newUsername) return alert("Gib einen Namen ein!");
+
+            const response = await fetch('/changeUsername', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newUsername })
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert("Username changed successfully!");
+                location.reload();
+            } else {
+                alert(data.error); //once a day fehler
             }
         });
     }
-
-}
+};
