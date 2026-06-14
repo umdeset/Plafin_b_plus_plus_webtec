@@ -1,17 +1,26 @@
 let currentSession = null;
 
-// Spiele rendern
-const renderGames = async () => {
+
+// Diese Funktion rendert die Spiele-Karten dynamisch ins HTML
+const renderGames = async ()  => {
     const grid = document.getElementById('gameGrid');
-    if (!grid) return;
-    try {
+    if (!grid) return;   // Bricht ab, falls wir nicht auf dem Dashboard sind
+
+    try{
         const response = await fetch('/games/load');
-        if (!response.ok) throw new Error("Fehler beim Laden der Spiele");
+
+        if(!response.ok){
+            const errorData = await response.json();
+            throw new Error(errorData.error);
+        }
+
         const gameData = await response.json();
+
         let html = '';
+        // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
         gameData.forEach(g => {
             html += `
-            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.name)}'">
+            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.game)}'">
                 <img src="${g.image_url}" alt="${g.game}">
                 <div class="game-info">
                     <h3>${g.game}</h3>
@@ -22,6 +31,7 @@ const renderGames = async () => {
                 </div>
             </div>`;
         });
+        // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
         grid.innerHTML = html;
     } catch (err) {
         console.error(err);
@@ -29,7 +39,8 @@ const renderGames = async () => {
 };
 
 window.onload = async () => {
-    renderGames();
+    // Rendert sofort die Spiele, wenn die Seite lädt
+    await renderGames();
 
     // Session prüfen
     try {

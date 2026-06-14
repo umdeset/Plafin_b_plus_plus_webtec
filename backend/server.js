@@ -47,6 +47,12 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/login.html'));
 });
 
+app.get('/groups/:game', requiredLogin, (req, res) => {
+    const game = req.params.game;
+    res.redirect(path.join(`/lobbies.html?game=${encodeURIComponent(game)}`));
+
+})
+
 app.post("/login", async (req, res) => {
     const { username, password } = req.body;
     try{
@@ -328,7 +334,8 @@ app.get("/groups", async (req, res) => {
                 max_players, 
                 current_players, 
                 creator_username,
-                tags
+                tags,
+                image_url
             FROM groups
         `;
         let filters = [];

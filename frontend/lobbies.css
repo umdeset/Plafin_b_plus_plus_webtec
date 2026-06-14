@@ -352,3 +352,39 @@ input[type="number"]::-webkit-inner-spin-button {
 input[type="number"] {
     -moz-appearance: textfield;
 }
+
+.search-results-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #1e1e24;
+    border: 1px solid #333;
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    margin-top: 5px;
+}
+
+.search-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    cursor: pointer;
+    color: #fff;
+    transition: background 0.2s;
+}
+
+.search-item:hover {
+    background-color: #2a2d35;
+}
+
+.search-item img {
+    width: 30px;
+    height: 30px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 10px;
+}
