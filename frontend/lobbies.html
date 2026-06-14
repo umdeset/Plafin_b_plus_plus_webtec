@@ -85,13 +85,14 @@
         <div class="form-group half" style="position: relative;">
           <label for="modalGameInput">Search Game</label>
           <input type="text" id="modalGameInput" placeholder="Please enter a game." autocomplete="off" required>
-          <input type="hidden" id="modalHiddenGameInput" required>
+          <input type="hidden" id="modalHiddenGameInput">
 
           <div id="searchResults" class="search-results-dropdown" style="display: none;"></div>
         </div>
         <div class="form-group half">
-          <label>Select Mode</label>
+          <label for="modalMode">Select Mode</label>
           <select id="modalMode" required>
+            <option value="">Select Game</option>
             <option value="Casual">Casual</option>
             <option value="Ranked">Ranked</option>
           </select>
