@@ -46,20 +46,6 @@
     <div class="filter-group">
       <label>GAME</label>
       <select id="gameFilter">
-        <option value="ALL">ALL GAMES</option>
-        <option value="Minecraft">MINECRAFT</option>
-        <option value="Grand Theft Auto V">GTA5</option>
-        <option value="Apex Legends">APEX LEGENDS</option>
-        <option value="Counter Strike 2">COUNTER STRIKE 2</option>
-        <option value="Fortnite">FORTNITE</option>
-        <option value="Rainbow 6 Siege">RAINBOW 6 SIEGE</option>
-        <option value="League of Legends">LEAGUE OF LEGENDS</option>
-        <option value="World of Warcraft">WORLD OF WARCRAFT</option>
-        <option value="Valorant">VALORANT</option>
-        <option value="Ark Survival">ARK SURVIVAL</option>
-        <option value="Chess.com">CHESS.COM</option>
-        <option value="Call of Duty: Black Ops 6">COD: BO6</option>
-        <option value="Roblox">ROBLOX</option>
       </select>
     </div>
 
@@ -96,14 +82,12 @@
 
     <form id="createLobbyForm">
       <div class="form-row">
-        <div class="form-group half">
-          <label>Select Game</label>
-          <select id="modalGame" required>
-            <option value="Minecraft">MINECRAFT</option>
-            <option value="Grand Theft Auto V">GTA5</option>
-            <option value="Apex Legends">APEX LEGENDS</option>
-            <option value="Valorant">VALORANT</option>
-          </select>
+        <div class="form-group half" style="position: relative;">
+          <label for="modalGameInput">Search Game</label>
+          <input type="text" id="modalGameInput" placeholder="Please enter a game." autocomplete="off" required>
+          <input type="hidden" id="modalHiddenGameInput" required>
+
+          <div id="searchResults" class="search-results-dropdown" style="display: none;"></div>
         </div>
         <div class="form-group half">
           <label>Select Mode</label>

@@ -20,7 +20,7 @@ const renderGames = async ()  => {
         // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
         gameData.forEach(g => {
             html += `
-            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.name)}'">
+            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.game)}'">
                 <img src="${g.image_url}" alt="${g.game}">
                 <div class="game-info">
                     <h3>${g.game}</h3>
@@ -43,7 +43,7 @@ const renderGames = async ()  => {
 
 window.onload = async () => {
     // Rendert sofort die Spiele, wenn die Seite lädt
-    renderGames();
+    await renderGames();
 
     const logoutBtn = document.getElementById('logoutBtn');
 

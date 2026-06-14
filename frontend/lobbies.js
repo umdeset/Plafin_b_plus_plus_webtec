@@ -1,23 +1,16 @@
-// Spiele-Map für die Bilder-Zuweisung innerhalb der Lobbies
-const gameImages = {
-    "Minecraft": "images/games/Minecraft.jpg",
-    "Grand Theft Auto V": "images/games/GTA5.jpg",
-    "Apex Legends": "images/games/APEX.jpeg.webp",
-    "Counter Strike 2": "images/games/CS2.jpg",
-    "Fortnite": "images/games/Fortnite.webp",
-    "Rainbow 6 Siege": "images/games/Rainbow6.jpg",
-    "League of Legends": "images/games/LOL.jpeg.webp",
-    "World of Warcraft": "images/games/WOW.webp",
-    "Valorant": "images/games/Valorant.jpg",
-    "Ark Survival": "images/games/ARK.jpg",
-    "Chess.com": "images/games/chess.webp",
-    "Call of Duty: Black Ops 6": "images/games/COD_BO6.webp",
-    "Roblox": "images/games/Roblox.jpg"
-};
-
+let isFirstLoad = true;
 // Holt alle Lobbies vom Server und filtert sie im Frontend
 async function loadLobbies() {
-    const gameFilter = document.getElementById('gameFilter').value;
+    const gameFilter = document.getElementById('gameFilter');
+
+    let currentSelectedGame = gameFilter.value
+
+    if(isFirstLoad) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlGame = urlParams.get('game');
+        if(urlGame) currentSelectedGame = urlGame;
+        isFirstLoad = false;
+    }
 
     // Holt den aktuell aktiven Mode (Casual oder Ranked)
     const activeModeBtn = document.querySelector('.toggle-btn.active');
@@ -32,15 +25,33 @@ async function loadLobbies() {
 
     try {
         const response = await fetch('/groups');
-        if (!response.ok) throw new Error("Fehler beim Laden der Gruppen");
+        if (!response.ok) throw new Error("Error loading lobbies");
         const groups = await response.json();
+
+        //Dynamische Suche
+        const uniqueGames = [...new Set(groups.map(g => g.game))];
+
+        let dropdownMenu = '<option value="ALL">ALL GAMES</option>';
+
+        uniqueGames.forEach(name => {
+            dropdownMenu += `<option value="${name}">${name}</option>`;
+        });
+
+        gameFilter.innerHTML = dropdownMenu;
+
+        if(currentSelectedGame === "ALL" || uniqueGames.includes(currentSelectedGame)) {
+            gameFilter.value = currentSelectedGame;
+        }else{
+            gameFilter.value = "ALL";
+            currentSelectedGame = "ALL";
+        }
 
         let html = '';
 
         // filter logik
         const filteredGroups = groups.filter(group => {
             // Check Game
-            if (gameFilter !== "ALL" && group.game !== gameFilter) return false;
+            if (currentSelectedGame !== "ALL" && group.game !== currentSelectedGame) return false;
 
             // Wir wandeln die Tags aus der DB in Kleinbuchstaben um um Fehler zu vermeiden
             const groupTags = group.tags ? group.tags.toLowerCase() : "";
@@ -61,7 +72,7 @@ async function loadLobbies() {
         }
 
         filteredGroups.forEach(group => {
-            const imgPath = gameImages[group.game] || 'images/default.jpg';
+            const imgPath = group.image_url;
             const lobbyTitle = group.title || `${group.game} Lounge`;
 
             // Tags dynamisch generieren
@@ -97,7 +108,7 @@ async function loadLobbies() {
                         <div class="lobby-tags">
                             ${tagsHtml} 
                         </div>
-                        <button class="btn-join">Join Lobby</button>
+                        <button class="btn-join" onclick="joinLobby(${group.id})">Join Lobby</button>
                     </div>
                 </div>
             `;
@@ -107,6 +118,29 @@ async function loadLobbies() {
 
     } catch (err) {
         console.error("Lobby-Load Error:", err);
+    }
+}
+
+async function joinLobby(groupId) {
+    try{
+        const response = await fetch(`/groups/${groupId}/join`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if(response.ok) {
+            alert("You joined the group!") //später wird mit verlinkung auf lobby ersetzt
+            await loadLobbies(groupId);
+        } else {
+            alert("Error: " + data.error);
+        }
+    }catch(err) {
+        console.error("Lobby-Load Error:", err);
+        alert("Unexpected Error occurred. Please try again.");
     }
 }
 
@@ -168,6 +202,70 @@ window.onload = async () => {
         });
     });
 
+    const gameInput = document.getElementById('modalGameInput');
+    const hiddenGameInput = document.getElementById('modalHiddenGameInput');
+    const searchResults = document.getElementById('searchResults');
+    let timer;
+
+    gameInput.addEventListener('input', (e) => {
+        clearTimeout(timer);
+        const query = e.target.value.trim();
+
+        if(query.length < 3) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        timer = setTimeout(async () => {
+            try{
+                const response = await fetch(`/games/search?q=${encodeURIComponent(query)}`);
+                if(response.ok) {
+                    const games = await response.json();
+                    renderSearchResults(games);
+                } else {
+                    searchResults.innerHTML = '<div class="search-item" style="color: #ff6b6b;">Game Not Found</div>';
+                    searchResults.style.display = 'block';
+                }
+            }catch(err) {
+                console.error("Search Error:", err);
+            }
+        }, 500);
+    });
+
+    function renderSearchResults(games) {
+        if(games.length === 0) {
+            searchResults.innerHTML = '<div class="search-item">Game Not Found</div>';
+        }else {
+            let html = '';
+            games.forEach(game => {
+                html += `
+                <div class="search-item" data-gamename="${game.name}">
+                    <img src="${game.image_url}" alt="Game Cover">
+                    ${game.name}
+                </div>
+                `;
+            });
+            searchResults.innerHTML = html;
+
+            document.querySelectorAll('.search-item').forEach(searchResult => {
+                if(!searchResult.dataset.gamename) return;
+                searchResult.addEventListener('click', (e) => {
+                    gameInput.value = searchResult.dataset.gamename;
+                    hiddenGameInput.value = searchResult.dataset.gamename;
+                    searchResults.style.display = 'none';
+                });
+            });
+        }
+
+        searchResults.style.display = 'block';
+
+        document.addEventListener('click', (e) => {
+            if(!gameInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
+    }
+
 
 
     // create lobby logik
@@ -201,7 +299,7 @@ window.onload = async () => {
         e.preventDefault(); // Verhindert, dass die Seite neu lädt
 
         // Daten aus dem Formular auslesen
-        const game = document.getElementById('modalGame').value;
+        const game = document.getElementById('modalHiddenGameInput').value;
         const mode = document.getElementById('modalMode').value;
         const title = document.getElementById('modalTitle').value;
         const desc = document.getElementById('modalDesc').value;
@@ -243,5 +341,36 @@ window.onload = async () => {
             console.error(err);
         }
     });
+    //checks if user is logged in and shows a welcome message
+    try{
+        const response = await fetch('/session');
+        if (!response.ok) {
+            window.location.href='/';
+            return;
+        }
+        const userData = await response.json();
+        currentSession = userData;
+        document.getElementById('info').innerText = "Welcome : " + userData.username + " !";
+    }catch(err){
+        console.error("Error getting session data: ", err);
+        window.location.href='/';
+    }
+
+    if (logoutBtn) {
+        //asynch because it needs to wait for the response
+        logoutBtn.addEventListener('click', async () => {
+            try{
+                const response = await fetch("/logout");
+                if(response.ok){
+                    currentSession = null;
+                    location.replace('/')
+                }else{
+                    console.error("Logout denied")
+                }
+            }catch(err){
+                console.error("Logout Failed:  ", err);
+            }
+        });
+    }
 
 };
