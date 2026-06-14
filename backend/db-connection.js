@@ -40,6 +40,12 @@ async function connectDB() {
                 name VARCHAR(255) NOT NULL UNIQUE,
                 image_url VARCHAR(500)
             );
+            CREATE TABLE IF NOT EXISTS group_members (
+                group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (group_id, user_id)
+            );
         `);
         console.log('Database Ready');
         return client;

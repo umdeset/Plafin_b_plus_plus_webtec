@@ -1,44 +1,42 @@
 let currentSession = null;
 
-const games = [
-    { name: "Minecraft", img: "images/games/Minecraft.jpg", players: "4,867", lobbies: 158 },
-    { name: "Grand Theft Auto V", img: "images/games/GTA5.jpg", players: "4,867", lobbies: 158 },
-    { name: "Apex Legends", img: "images/games/APEX.jpeg.webp", players: "4,867", lobbies: 158 },
-    { name: "Counter Strike 2", img: "images/games/CS2.jpg", players: "4,867", lobbies: 158 },
-    { name: "Fortnite", img: "images/games/Fortnite.webp", players: "4,867", lobbies: 158 },
-    { name: "Rainbow 6 Siege", img: "images/games/Rainbow6.jpg", players: "4,867", lobbies: 158 },
-    { name: "League of Legends", img: "images/games/LOL.jpeg.webp", players: "4,867", lobbies: 158 },
-    { name: "World of Warcraft", img: "images/games/WOW.webp", players: "4,867", lobbies: 158 },
-    { name: "Valorant", img: "images/games/Valorant.jpg", players: "4,867", lobbies: 158 },
-    { name: "Ark Survival", img: "images/games/ARK.jpg", players: "4,867", lobbies: 158 },
-    { name: "Chess.com", img: "images/games/chess.webp", players: "4,867", lobbies: 158 },
-    { name: "World of WarcraftCall of Duty: Black Ops 6", img: "images/games/COD_BO6.webp", players: "4,867", lobbies: 158 },
-    { name: "Roblox", img: "images/games/Roblox.jpg", players: "4,867", lobbies: 158 }
-];
 
 // Diese Funktion rendert die Spiele-Karten dynamisch ins HTML
-function renderGames() {
+const renderGames = async ()  => {
     const grid = document.getElementById('gameGrid');
     if (!grid) return;   // Bricht ab, falls wir nicht auf dem Dashboard sind
 
-    let html = '';
-    // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
-    games.forEach(game => {
-        html += `
-            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(game.name)}'">
-                <img src="${game.img}" alt="${game.name}">
+    try{
+        const response = await fetch('/games/load');
+
+        if(!response.ok){
+            const errorData = await response.json();
+            throw new Error(errorData.error);
+        }
+
+        const gameData = await response.json();
+
+        let html = '';
+        // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
+        gameData.forEach(g => {
+            html += `
+            <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.name)}'">
+                <img src="${g.image_url}" alt="${g.game}">
                 <div class="game-info">
-                    <h3>${game.name}</h3>
+                    <h3>${g.game}</h3>
                     <div class="stats">
-                        <p><span class="dot"></span>${game.players} Players Online</p>
-                        <p><span class="dot"></span>${game.lobbies} Active Lobbies</p>
+                        <p><span class="dot"></span>${g.players_online} Players Online</p>
+                        <p><span class="dot"></span>${g.active_lobbies} Active Lobbies</p>
                     </div>
                 </div>
             </div>
         `;
-    });
-    // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
-    grid.innerHTML = html;
+        });
+        // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
+        grid.innerHTML = html;
+    }catch (err){
+        console.error(err);
+    }
 }
 
 
