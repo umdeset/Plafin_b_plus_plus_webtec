@@ -137,4 +137,32 @@ window.onload = async () => {
             }
         });
     }
+    // --- Profil-Modal Logik ---
+    const profileIcon = document.querySelector('.user-profile');
+    const profileModal = document.getElementById('profileModal');
+
+    if (profileIcon && profileModal) {
+        profileIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+
+            if (!currentSession) {
+                alert("Session wird noch geladen, bitte kurz warten.");
+                return;
+            }
+
+            document.getElementById('profileUsername').innerText = `Hello, ${currentSession.username}!`;
+
+            const loginInfo = document.getElementById('profileLoginInfo');
+
+            // Logik: Local zeigt Email, andere zeigen Provider
+            if (currentSession.loginMethod === 'local') {
+                loginInfo.innerText = `Email: ${currentSession.email || 'Nicht hinterlegt'}`;
+            } else {
+                const provider = currentSession.loginMethod ?
+                    currentSession.loginMethod.charAt(0).toUpperCase() + currentSession.loginMethod.slice(1) : "Unbekannt";
+                loginInfo.innerText = `Angemeldet via: ${provider}`;
+            }
+            profileModal.style.display = 'flex';
+        });
+    }
 };

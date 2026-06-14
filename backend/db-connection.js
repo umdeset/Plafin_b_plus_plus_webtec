@@ -50,6 +50,10 @@ async function connectDB() {
         await client.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_username_change TIMESTAMP;
 `);
+        await client.query(`
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS last_username_change TIMESTAMP;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) DEFAULT NULL;
+        `);
         console.log('Database Ready');
         return client;
     }catch(err){

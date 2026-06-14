@@ -56,6 +56,7 @@ app.post("/login", async (req, res) => {
             req.session.user = {
                 id: user.id,
                 username: user.username,
+                email: user.email,
                 loginMethod: 'local',
                 loginTime: new Date().toISOString(),
             };
@@ -202,7 +203,7 @@ app.post('/auth/google', async (req, res) => {
             const insertQuery = 'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *';
             userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub]);
         }
-        req.session.user = { id: userResult.rows[0].id, username: userResult.rows[0].username };
+        req.session.user = { id: userResult.rows[0].id, username: userResult.rows[0].username, loginMethod: 'google' };
         res.status(200).json({ success: true });
 
     } catch (err) {
