@@ -787,17 +787,15 @@ app.post("/changePassword", requiredLogin, async (req, res) => {
 });
 
 app.post("/changeUsername", requiredLogin, async (req, res) => {
-    // 1. Nur lokale Accounts dürfen ändern
     if (req.session.user.loginMethod !== 'local') {
         return res.status(403).json({ error: "Nice try, but not you." });
     }
 
     const { newUsername } = req.body;
     const userId = req.session.user.id;
-    const oldUsername = req.session.user.username;
 
     try {
-        // 2. Cooldown prüfen
+        // 1. Cooldown prüfen
         const result = await db.query('SELECT last_username_change FROM users WHERE id = $1', [userId]);
         const lastChange = result.rows[0].last_username_change;
 
@@ -808,22 +806,26 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
             }
         }
 
+        // 2. NUR den User aktualisieren
+        // Da du ON UPDATE CASCADE hast, wird die Datenbank automatisch die
+        // creator_username in der Tabelle 'groups' mit aktualisieren!
+        await db.query(
+            'UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2',
+            [newUsername, userId]
+        );
 
-        await db.query('BEGIN');
-
-        await db.query('UPDATE groups SET creator_username = $1 WHERE creator_username = $2', [newUsername, oldUsername]);
-        await db.query('UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2', [newUsername, userId]);
-
-        await db.query('COMMIT');
-
-        // 4. Session aktualisieren
+        // 3. Session aktualisieren
         req.session.user.username = newUsername;
         res.status(200).json({ success: true });
 
     } catch (err) {
-        await db.query('ROLLBACK');
         console.error("Fehler beim Username ändern:", err);
-        res.status(500).json({ error: "Interner Server Fehler" });
+        // Prüfe, ob es ein Duplikat-Fehler (23505) ist
+        if (err.code === '23505') {
+            res.status(400).json({ error: "Username already taken." });
+        } else {
+            res.status(500).json({ error: "Interner Server Fehler" });
+        }
     }
 });
 const multer = require('multer');
