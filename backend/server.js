@@ -7,7 +7,8 @@ const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
 const connectDB = require('./db-connection.js');
 const app = express();
-
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY);
 // Parse urlencoded bodies
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -230,13 +231,13 @@ app.post('/auth/google', async (req, res) => {
 //exchange code for access token
 //async because it needs to wait for an exteral server
 app.post('/auth/discord', async (req, res) => {
-   try{
+    try {
         const tokenResponseData = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
             body: new URLSearchParams({
                 client_id: config.discord_Client_ID,
                 client_secret: config.discord_Client_Secret,
-                code:req.body.code,
+                code: req.body.code,
                 grant_type: 'authorization_code',
                 redirect_uri: "http://localhost:3000",
                 scope: 'identify',
@@ -248,50 +249,57 @@ app.post('/auth/discord', async (req, res) => {
 
         const oAuthData = await tokenResponseData.json();
 
-        if(!oAuthData.access_token) {
-            return res.status(400).json({error: "Could not get Discord token"});
+        if (!oAuthData.access_token) {
+            return res.status(400).json({ error: "Could not get Discord token" });
         }
 
-        //requests user from discord
+        // User von Discord abrufen
         const me = await fetch('https://discord.com/api/users/@me', {
             headers: {
                 authorization: `${oAuthData.token_type} ${oAuthData.access_token}`,
             },
         });
 
-        const discordUser = await me.json()
+        const discordUser = await me.json();
 
-       //
+        // 1. Avatar-URL berechnen
+        const avatarUrl = discordUser.avatar
+            ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+            : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0') % 5}.png`;
+
+        // 2. User in DB suchen
         let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
-        let user = userResult.rows[0];
 
-        if(!user){
-            const insertQuery= `
-                INSERT INTO users (username, discord_id) 
-                VALUES ($1, $2) 
+        if (userResult.rows.length === 0) {
+            // Neuer Discord User: INSERT
+            const insertQuery = `
+                INSERT INTO users (username, discord_id, avatar_url) 
+                VALUES ($1, $2, $3) 
                 RETURNING *;
             `;
-
-            const values = [discordUser.username, discordUser.id];
-            userResult = await db.query(insertQuery, values);
-            user = userResult.rows[0];
-            console.log("New Discord User saved in database:", user.username);
-        }else{
-            console.log("Known Discord User logged in:", user.username);
+            userResult = await db.query(insertQuery, [discordUser.username, discordUser.id, avatarUrl]);
+            console.log("New Discord User saved:", discordUser.username);
+        } else {
+            // Bekannter User: UPDATE (falls sich das Profilbild geändert hat)
+            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE discord_id = $2 RETURNING *';
+            userResult = await db.query(updateQuery, [avatarUrl, discordUser.id]);
+            console.log("Known Discord User logged in:", discordUser.username);
         }
 
-        //local session gets created with discord information
+        // 3. Session mit avatar_url erstellen
+        const user = userResult.rows[0];
         req.session.user = {
             id: user.id,
             username: user.username,
+            avatar_url: user.avatar_url,
             loginMethod: 'discord'
         };
 
-        res.status(200).json({success: true})
-   }catch(err){
-       console.error("Discord Auth failed: " + err);
-       res.status(500).json({error: "Internal Server Error during Discord authentication"});
-   }
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Discord Auth failed: " + err);
+        res.status(500).json({ error: "Internal Server Error during Discord authentication" });
+    }
 });
 
 //exchange access Token for user
@@ -714,6 +722,46 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
         await db.query('ROLLBACK');
         console.error("Fehler beim Username ändern:", err);
         res.status(500).json({ error: "Interner Server Fehler" });
+    }
+});
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() }); // Datei im RAM statt auf Festplatte
+
+app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "Keine Datei ausgewählt" });
+
+    const userId = req.session.user.id;
+    const fileExt = req.file.originalname.split('.').pop();
+    const fileName = `avatar_${userId}_${Date.now()}.${fileExt}`;
+
+    try {
+        // 1. In Supabase Storage hochladen
+        const { data, error } = await supabase.storage
+            .from('avatars') // Dein Bucket-Name
+            .upload(fileName, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        // 2. Öffentliche URL generieren
+        const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+        const avatarUrl = publicUrlData.publicUrl;
+
+        // 3. In Datenbank speichern
+        await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, userId]);
+
+        // 4. Session aktualisieren
+        req.session.user.avatar_url = avatarUrl;
+
+        res.status(200).json({ success: true, avatar_url: avatarUrl });
+    } catch (err) {
+        console.error("Supabase Upload Fehler:", err);
+        res.status(500).json({ error: "Fehler beim Cloud-Upload" });
     }
 });
 

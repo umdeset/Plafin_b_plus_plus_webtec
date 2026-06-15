@@ -112,6 +112,7 @@ window.onload = async () => {
     const usernameChangeBtn = document.getElementById('changeUsernameViewBtn');
     const passwordSection = document.getElementById('passwordSettingsSection');
     const usernameSection = document.getElementById('usernameSettingsSection');
+    const uploadSection = document.getElementById('uploadSection');
 
 // auführen wenn die elemente auch wirklich existieren
     if (passwordSection && usernameSection) {
@@ -119,10 +120,12 @@ window.onload = async () => {
             // Lokaler User: Alles anzeigen
             passwordSection.style.display = 'block';
             usernameSection.style.display = 'block';
+            if(uploadSection) uploadSection.style.display = 'block';
         } else {
             // Google/Discord User: Alles ausblenden
             passwordSection.style.display = 'none';
             usernameSection.style.display = 'none';
+            if(uploadSection) uploadSection.style.display = 'none';
         }
     }
 
@@ -161,10 +164,12 @@ window.onload = async () => {
                 return;
             }
             const avatarImg = document.getElementById('profileAvatar');
-            if (currentSession.avatar_url){
+            if (currentSession.avatar_url) {
                 avatarImg.src = currentSession.avatar_url;
-                avatarImg.style.display = 'inline-block';
+            } else {
+                avatarImg.src = 'images/plafinDefault.png';
             }
+            avatarImg.style.display = 'inline-block';
             document.getElementById('profileUsername').innerText = `Hello, ${currentSession.username}!`;
             const loginInfo = document.getElementById('profileLoginInfo');
 
@@ -178,6 +183,33 @@ window.onload = async () => {
                 loginInfo.innerText = `Angemeldet via: ${provider}`;
             }
             profileModal.style.display = 'flex';
+        });
+    }
+    const uploadAvatarBtn = document.getElementById('uploadAvatarBtn');
+    const avatarInput = document.getElementById('avatarInput');
+
+    if (uploadAvatarBtn) {
+        uploadAvatarBtn.addEventListener('click', async () => {
+            const file = avatarInput.files[0];
+            if (!file) return alert("Wähle zuerst ein Bild aus!");
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            const response = await fetch('/upload-avatar', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                alert("Bild erfolgreich hochgeladen!");
+                // Session lokal aktualisieren und UI refreshen
+                currentSession.avatar_url = data.avatar_url;
+                document.getElementById('profileAvatar').src = data.avatar_url;
+            } else {
+                alert(data.error);
+            }
         });
     }
 };
