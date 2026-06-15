@@ -9,6 +9,9 @@ const connectDB = require('./db-connection.js');
 const app = express();
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY);
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+
 // Parse urlencoded bodies
 app.use(express.json())
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -21,7 +24,7 @@ connectDB().then(client => {
 // maybe use helmet later on
 app.use(session({
     //needs to store the sessio somewhere
-    store: new FileStore({ path: './sessions' }),
+    store: new FileStore({ path: path.join(__dirname, 'sessions') }),
     secret: config.JWT_SECRET,
     resave: false,
     //tells the server that the session is stored
@@ -226,6 +229,105 @@ app.post('/auth/google', async (req, res) => {
         res.status(500).json({ error: "Google-Authentifizierung fehlgeschlagen" });
     }
 });
+app.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
+        );
+
+        const user = result.rows[0];
+
+
+
+        if (!user) {
+            return res.status(404).json({
+                error: "No user found with this email address."
+            });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15);
+
+        await db.query(
+            "UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3",
+            [resetToken, resetTokenExpires, email]
+        );
+
+        const resetLink = `http://localhost:3000/reset-password.html?token=${resetToken}`;
+
+        const transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+        console.log("User found:", email);
+        console.log("Reset token created:", resetToken);
+        console.log("Reset link:", resetLink);
+
+        try {
+            await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: "Reset your Plafin password",
+                text: `Click this link to reset your password: ${resetLink}`
+            });
+
+            return res.status(200).json({
+                message: "Password reset link has been sent to your email."
+            });
+
+        } catch (mailErr) {
+            console.error("Email could not be sent:", mailErr);
+            console.log("Use this reset link manually:", resetLink);
+
+            return res.status(200).json({
+                message: "Email could not be sent, but reset link was created. Check server console."
+            });
+        }
+
+    } catch (err) {
+        console.error("Forgot password error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+app.post("/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            [token]
+        );
+
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired reset link." });
+        }
+
+        const password_hash = await bcrypt.hash(newPassword, 10);
+
+        await db.query(
+            "UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2",
+            [password_hash, user.id]
+        );
+
+        res.status(200).json({ message: "Password reset successful." });
+
+    } catch (err) {
+        console.error("Reset password error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 
 //-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
 //exchange code for access token
