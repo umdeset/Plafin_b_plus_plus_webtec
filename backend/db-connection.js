@@ -42,7 +42,7 @@ async function connectDB() {
             );
             CREATE TABLE IF NOT EXISTS group_members (
                 group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (group_id, user_id)
             );

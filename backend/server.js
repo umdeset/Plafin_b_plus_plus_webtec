@@ -392,6 +392,7 @@ app.get("/games/load", async (req, res) => {
 //create groups
 app.post("/groups", requiredLogin, async (req, res) => {
     const creator_username = req.session.user.username;
+    const creator_id = req.session.user.id;
     const {game, title, description, max_players, tags} = req.body;
 
     if(!game || !description || !max_players){
@@ -400,12 +401,18 @@ app.post("/groups", requiredLogin, async (req, res) => {
 
     const safeTags = tags ? tags.trim() : "";
 
+    const checkUser = await db.query('SELECT user_id FROM group_members WHERE user_id = $1', [creator_id])
     const checkGame = await db.query('SELECT image_url FROM games WHERE name = $1', [game.trim()]);
 
     if (checkGame.rowCount === 0) {
-
         return res.status(400).json({
             error: "This game does not exist yet"
+        })
+    }
+
+    if(checkUser.rowCount !== 0){
+        return res.status(400).json({
+            error: "You are already in a lobby"
         })
     }
 
@@ -511,7 +518,7 @@ app.post("/groups/:id/join", requiredLogin, async (req, res) => {
         }catch(err){
             //23505 Postgres besonderer Fehler "Unique Violation", bedeutet für uns das der user schon in dieser gruppe ist
             if(err.code === '23505'){
-                return res.status(400).json({error: "You are already joined this group!"});
+                return res.status(400).json({error: "You already joined a group!"});
             }
             throw err;
         }

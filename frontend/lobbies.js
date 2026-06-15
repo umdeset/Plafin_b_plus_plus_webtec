@@ -136,7 +136,7 @@ async function joinLobby(groupId) {
             alert("You joined the group!") //später wird mit verlinkung auf lobby ersetzt
             await loadLobbies(groupId);
         } else {
-            alert("Error: " + data.error);
+            alert(data.error);
         }
     }catch(err) {
         console.error("Lobby-Load Error:", err);
