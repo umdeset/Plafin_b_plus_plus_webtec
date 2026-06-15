@@ -11,7 +11,12 @@ const connectDB = require('./db-connection.js');
 const app = express();
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Erlaubt jedem Gerät im Netzwerk den Zugriff
+        methods: ["GET", "POST"]
+    }
+});
 
 // Live-Chat Logik
 io.on('connection', (socket) => {

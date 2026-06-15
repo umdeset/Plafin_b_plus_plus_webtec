@@ -27,23 +27,24 @@
 }
 
 .chat-message {
-    background-color: #2b2b36;
+    background-color: #4CAF50; /* Angenehmes Grün */
+    color: white;
     padding: 12px 16px;
     border-radius: 8px;
     max-width: 80%;
-    align-self: flex-start;
+    align-self: flex-start; /* Drückt die Blase nach links */
 }
 
 .chat-message.self {
-    background-color: #4da6ff;
+    background-color: #4da6ff; /* Dein schickes Blau */
     color: white;
-    align-self: flex-end;
+    align-self: flex-end; /* Drückt die Blase nach rechts */
 }
 
 .chat-message strong {
     display: block;
     font-size: 12px;
-    color: #aaa;
+    color: #e0e0e0; /* Helles Grau, damit es auf Blau und Grün gut lesbar ist */
     margin-bottom: 4px;
 }
 
