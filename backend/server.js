@@ -281,10 +281,8 @@ app.post("/forgot-password", async (req, res) => {
 
 
 
-        if (!user) {
-            return res.status(404).json({
-                error: "No user found with this email address."
-            });
+        if (!user||!user.password_hash) {
+            return res.status(200).json({ message: "If this account exists, you will receive an email." });
         }
 
         const resetToken = crypto.randomBytes(32).toString("hex");
