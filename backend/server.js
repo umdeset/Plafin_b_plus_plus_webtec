@@ -711,7 +711,6 @@ app.delete("/groups/:id/leave", requiredLogin, async (req, res) => {
         }
 
         const deleteResult = await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, userId]);
-
         if(deleteResult.rowCount === 0){
             return res.status(404).json({error: "You are not in this group!"});
         }
@@ -723,6 +722,17 @@ app.delete("/groups/:id/leave", requiredLogin, async (req, res) => {
         `;
 
         const updatedGroup = await db.query(query, [groupId]);
+
+        const isEmpty = await db.query('SELECT current_players FROM groups WHERE id = $1',[groupId]);
+        const remainingPlayers = isEmpty.rows[0].current_players
+        if(remainingPlayers === 0){
+            const query = `
+            DELETE FROM groups 
+            WHERE id = $1
+            `;
+
+            await db.query(query, [groupId]);
+        }
 
         io.to(groupId.toString()).emit('updatePlayerList')
 
