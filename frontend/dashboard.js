@@ -160,10 +160,14 @@ window.onload = async () => {
                 alert("Session wird noch geladen, bitte kurz warten.");
                 return;
             }
-
+            const avatarImg = document.getElementById('profileAvatar');
+            if (currentSession.avatar_url){
+                avatarImg.src = currentSession.avatar_url;
+                avatarImg.style.display = 'inline-block';
+            }
             document.getElementById('profileUsername').innerText = `Hello, ${currentSession.username}!`;
-
             const loginInfo = document.getElementById('profileLoginInfo');
+
 
             // Logik: Local zeigt Email, andere zeigen Provider
             if (currentSession.loginMethod === 'local') {

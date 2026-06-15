@@ -65,6 +65,7 @@ app.post("/login", async (req, res) => {
                 email: user.email,
                 loginMethod: 'local',
                 loginTime: new Date().toISOString(),
+                avatar_url: user.avatar_url,
             };
 
             res.status(200).json(req.session.user);
@@ -206,10 +207,17 @@ app.post('/auth/google', async (req, res) => {
         let userResult = await db.query('SELECT * FROM users WHERE google_id = $1', [googleUser.sub]);
 
         if (userResult.rows.length === 0) {
-            const insertQuery = 'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *';
-            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub]);
-        }
-        req.session.user = { id: userResult.rows[0].id, username: userResult.rows[0].username, loginMethod: 'google' };
+            const insertQuery = 'INSERT INTO users (username, email, google_id, avatar_url) VALUES ($1, $2, $3, $4) RETURNING *';
+            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub, googleUser.picture]);
+        }else {
+            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE google_id = $2 RETURNING *';
+            userResult = await db.query(updateQuery, [googleUser.picture, googleUser.sub]);        }
+        req.session.user = {
+            id: userResult.rows[0].id,
+            username: userResult.rows[0].username,
+            loginMethod: 'google',
+            avatar_url: userResult.rows[0].avatar_url,
+        };
         res.status(200).json({ success: true });
 
     } catch (err) {
