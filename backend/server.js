@@ -9,6 +9,10 @@ const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
 const connectDB = require('./db-connection.js');
 const app = express();
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY);
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const server = http.createServer(app);
 const io = new Server(server);
@@ -37,7 +41,7 @@ connectDB().then(client => {
 // maybe use helmet later on
 app.use(session({
     //needs to store the sessio somewhere
-    store: new FileStore({ path: './sessions' }),
+    store: new FileStore({ path: path.join(__dirname, 'sessions') }),
     secret: config.JWT_SECRET,
     resave: false,
     //tells the server that the session is stored
@@ -82,6 +86,7 @@ app.post("/login", async (req, res) => {
                 email: user.email,
                 loginMethod: 'local',
                 loginTime: new Date().toISOString(),
+                avatar_url: user.avatar_url,
             };
 
             res.status(200).json(req.session.user);
@@ -223,10 +228,17 @@ app.post('/auth/google', async (req, res) => {
         let userResult = await db.query('SELECT * FROM users WHERE google_id = $1', [googleUser.sub]);
 
         if (userResult.rows.length === 0) {
-            const insertQuery = 'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *';
-            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub]);
-        }
-        req.session.user = { id: userResult.rows[0].id, username: userResult.rows[0].username, loginMethod: 'google' };
+            const insertQuery = 'INSERT INTO users (username, email, google_id, avatar_url) VALUES ($1, $2, $3, $4) RETURNING *';
+            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub, googleUser.picture]);
+        }else {
+            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE google_id = $2 RETURNING *';
+            userResult = await db.query(updateQuery, [googleUser.picture, googleUser.sub]);        }
+        req.session.user = {
+            id: userResult.rows[0].id,
+            username: userResult.rows[0].username,
+            loginMethod: 'google',
+            avatar_url: userResult.rows[0].avatar_url,
+        };
         res.status(200).json({ success: true });
 
     } catch (err) {
@@ -234,18 +246,117 @@ app.post('/auth/google', async (req, res) => {
         res.status(500).json({ error: "Google-Authentifizierung fehlgeschlagen" });
     }
 });
+app.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM users WHERE email = $1",
+            [email]
+        );
+
+        const user = result.rows[0];
+
+
+
+        if (!user) {
+            return res.status(404).json({
+                error: "No user found with this email address."
+            });
+        }
+
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15);
+
+        await db.query(
+            "UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE email = $3",
+            [resetToken, resetTokenExpires, email]
+        );
+
+        const resetLink = `http://localhost:3000/reset-password.html?token=${resetToken}`;
+
+        const transporter = nodemailer.createTransport({
+            host: "smtp.gmail.com",
+            port: 587,
+            secure: false,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+        console.log("User found:", email);
+        console.log("Reset token created:", resetToken);
+        console.log("Reset link:", resetLink);
+
+        try {
+            await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: email,
+                subject: "Reset your Plafin password",
+                text: `Click this link to reset your password: ${resetLink}`
+            });
+
+            return res.status(200).json({
+                message: "Password reset link has been sent to your email."
+            });
+
+        } catch (mailErr) {
+            console.error("Email could not be sent:", mailErr);
+            console.log("Use this reset link manually:", resetLink);
+
+            return res.status(200).json({
+                message: "Email could not be sent, but reset link was created. Check server console."
+            });
+        }
+
+    } catch (err) {
+        console.error("Forgot password error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+app.post("/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    try {
+        const result = await db.query(
+            "SELECT * FROM users WHERE reset_token = $1 AND reset_token_expires > NOW()",
+            [token]
+        );
+
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired reset link." });
+        }
+
+        const password_hash = await bcrypt.hash(newPassword, 10);
+
+        await db.query(
+            "UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL WHERE id = $2",
+            [password_hash, user.id]
+        );
+
+        res.status(200).json({ message: "Password reset successful." });
+
+    } catch (err) {
+        console.error("Reset password error:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 
 //-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
 //exchange code for access token
 //async because it needs to wait for an exteral server
 app.post('/auth/discord', async (req, res) => {
-   try{
+    try {
         const tokenResponseData = await fetch('https://discord.com/api/oauth2/token', {
             method: 'POST',
             body: new URLSearchParams({
                 client_id: config.discord_Client_ID,
                 client_secret: config.discord_Client_Secret,
-                code:req.body.code,
+                code: req.body.code,
                 grant_type: 'authorization_code',
                 redirect_uri: "http://localhost:3000",
                 scope: 'identify',
@@ -257,50 +368,57 @@ app.post('/auth/discord', async (req, res) => {
 
         const oAuthData = await tokenResponseData.json();
 
-        if(!oAuthData.access_token) {
-            return res.status(400).json({error: "Could not get Discord token"});
+        if (!oAuthData.access_token) {
+            return res.status(400).json({ error: "Could not get Discord token" });
         }
 
-        //requests user from discord
+        // User von Discord abrufen
         const me = await fetch('https://discord.com/api/users/@me', {
             headers: {
                 authorization: `${oAuthData.token_type} ${oAuthData.access_token}`,
             },
         });
 
-        const discordUser = await me.json()
+        const discordUser = await me.json();
 
-       //
+        // 1. Avatar-URL berechnen
+        const avatarUrl = discordUser.avatar
+            ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
+            : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0') % 5}.png`;
+
+        // 2. User in DB suchen
         let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
-        let user = userResult.rows[0];
 
-        if(!user){
-            const insertQuery= `
-                INSERT INTO users (username, discord_id) 
-                VALUES ($1, $2) 
+        if (userResult.rows.length === 0) {
+            // Neuer Discord User: INSERT
+            const insertQuery = `
+                INSERT INTO users (username, discord_id, avatar_url) 
+                VALUES ($1, $2, $3) 
                 RETURNING *;
             `;
-
-            const values = [discordUser.username, discordUser.id];
-            userResult = await db.query(insertQuery, values);
-            user = userResult.rows[0];
-            console.log("New Discord User saved in database:", user.username);
-        }else{
-            console.log("Known Discord User logged in:", user.username);
+            userResult = await db.query(insertQuery, [discordUser.username, discordUser.id, avatarUrl]);
+            console.log("New Discord User saved:", discordUser.username);
+        } else {
+            // Bekannter User: UPDATE (falls sich das Profilbild geändert hat)
+            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE discord_id = $2 RETURNING *';
+            userResult = await db.query(updateQuery, [avatarUrl, discordUser.id]);
+            console.log("Known Discord User logged in:", discordUser.username);
         }
 
-        //local session gets created with discord information
+        // 3. Session mit avatar_url erstellen
+        const user = userResult.rows[0];
         req.session.user = {
             id: user.id,
             username: user.username,
+            avatar_url: user.avatar_url,
             loginMethod: 'discord'
         };
 
-        res.status(200).json({success: true})
-   }catch(err){
-       console.error("Discord Auth failed: " + err);
-       res.status(500).json({error: "Internal Server Error during Discord authentication"});
-   }
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Discord Auth failed: " + err);
+        res.status(500).json({ error: "Internal Server Error during Discord authentication" });
+    }
 });
 
 //exchange access Token for user
@@ -718,17 +836,15 @@ app.post("/changePassword", requiredLogin, async (req, res) => {
 });
 
 app.post("/changeUsername", requiredLogin, async (req, res) => {
-    // 1. Nur lokale Accounts dürfen ändern
     if (req.session.user.loginMethod !== 'local') {
         return res.status(403).json({ error: "Nice try, but not you." });
     }
 
     const { newUsername } = req.body;
     const userId = req.session.user.id;
-    const oldUsername = req.session.user.username;
 
     try {
-        // 2. Cooldown prüfen
+        // 1. Cooldown prüfen
         const result = await db.query('SELECT last_username_change FROM users WHERE id = $1', [userId]);
         const lastChange = result.rows[0].last_username_change;
 
@@ -739,22 +855,66 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
             }
         }
 
+        // 2. NUR den User aktualisieren
+        // Da du ON UPDATE CASCADE hast, wird die Datenbank automatisch die
+        // creator_username in der Tabelle 'groups' mit aktualisieren!
+        await db.query(
+            'UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2',
+            [newUsername, userId]
+        );
 
-        await db.query('BEGIN');
-
-        await db.query('UPDATE groups SET creator_username = $1 WHERE creator_username = $2', [newUsername, oldUsername]);
-        await db.query('UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2', [newUsername, userId]);
-
-        await db.query('COMMIT');
-
-        // 4. Session aktualisieren
+        // 3. Session aktualisieren
         req.session.user.username = newUsername;
         res.status(200).json({ success: true });
 
     } catch (err) {
-        await db.query('ROLLBACK');
         console.error("Fehler beim Username ändern:", err);
-        res.status(500).json({ error: "Interner Server Fehler" });
+        // Prüfe, ob es ein Duplikat-Fehler (23505) ist
+        if (err.code === '23505') {
+            res.status(400).json({ error: "Username already taken." });
+        } else {
+            res.status(500).json({ error: "Interner Server Fehler" });
+        }
+    }
+});
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() }); // Datei im RAM statt auf Festplatte
+
+app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "Keine Datei ausgewählt" });
+
+    const userId = req.session.user.id;
+    const fileExt = req.file.originalname.split('.').pop();
+    const fileName = `avatar_${userId}_${Date.now()}.${fileExt}`;
+
+    try {
+        // 1. In Supabase Storage hochladen
+        const { data, error } = await supabase.storage
+            .from('avatars') // Dein Bucket-Name
+            .upload(fileName, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        // 2. Öffentliche URL generieren
+        const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+
+        const avatarUrl = publicUrlData.publicUrl;
+
+        // 3. In Datenbank speichern
+        await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, userId]);
+
+        // 4. Session aktualisieren
+        req.session.user.avatar_url = avatarUrl;
+
+        res.status(200).json({ success: true, avatar_url: avatarUrl });
+    } catch (err) {
+        console.error("Supabase Upload Fehler:", err);
+        res.status(500).json({ error: "Fehler beim Cloud-Upload" });
     }
 });
 

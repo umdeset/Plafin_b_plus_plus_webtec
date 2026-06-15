@@ -11,5 +11,8 @@ module.exports = {
     GOOGLE_REDIRECT_URI: 'http://localhost:3000/auth/google/callback',
     JWT_SECRET: process.env.JWT_SECRET || 'JWT-secretkey',
     postgresURI: process.env.POSTGRES_URI,
-    RAWG_API_KEY: process.env.RAWG_API_KEY
+    RAWG_API_KEY: process.env.RAWG_API_KEY,
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
 };
