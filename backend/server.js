@@ -13,7 +13,9 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_KEY);
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-
+const groupsRoutes = require("./routes/groups");
+const authRoutes= require("./routes/auth");
+const usersRoutes = require("./routes/users");
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -32,9 +34,6 @@ io.on('connection', (socket) => {
 // Parse urlencoded bodies
 app.use(express.json())
 let db;
-connectDB().then(client => {
-    db = client;
-});
 // Session middeware
 // instead of nodemon, use node server/server.js
 // maybe use helmet later on
@@ -92,18 +91,6 @@ const requiredLogin = (req, res, next) => {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/login.html'));
 });
-
-app.get('/groups/:game', requiredLogin, (req, res) => {
-    const game = req.params.game;
-    res.redirect(path.join(`/lobbies.html?game=${encodeURIComponent(game)}`));
-
-})
-
-app.get('/groups/:game', requiredLogin, (req, res) => {
-    const game = req.params.game;
-    res.redirect(path.join(`/lobbies.html?game=${encodeURIComponent(game)}`));
-
-})
 
 app.post("/login", async (req, res) => {
     const { username, password } = req.body;
@@ -178,96 +165,8 @@ app.post('/register', async (req, res) => {
             res.status(500).json({error:"Internal Server Error"});
         }
     }
-
-    // if(userModel[registerUsername]){
-    //     return res.status(409).json({error: "Username is already taken"});
-    // }
-    //
-    // for(const user of Object.values(userModel)) {
-    //     if(user.email === email){
-    //         return res.status(409).json({error: "Email already exists"});
-    //     }
-    // }
-    //
-    // if(registerPassword !== confirmPassword){
-    //     return res.status(401).json({error: "Password does not match"});
-    // }
-    //
-    //
-    // const hashedPassword = bcrypt.hashSync(registerPassword, 10);
-    //
-    // userModel[registerUsername] = {
-    //     username: registerUsername,
-    //     password: hashedPassword,
-    //     email: email
-    // }
-    //
-    //
-    // try{
-    //     const userFilePath = path.join(__dirname, 'users.json');
-    //     fs.writeFileSync(userFilePath, JSON.stringify(userModel, null, 2));
-    //     res.status(200).json({message: 'Successfully created user'});
-    // }catch(err){
-    //     console.error("Error creating user: " + err);
-    //     res.status(500).json({error: "Internal Server Error"});
-    // }
 });
 
-//app.delete("/deleteAccount", function (req, res) {
-//    const {}
-//})
-
-//-----------------------------------------------------------FOR GOOGLE-------------------------------------------------------------------------------------
-app.post('/auth/google', async (req, res) => {
-    const { code } = req.body;
-
-    try {
-        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                client_id: config.GOOGLE_CLIENT_ID,
-                client_secret: config.GOOGLE_CLIENT_SECRET,
-                code: code,
-                grant_type: 'authorization_code',
-                redirect_uri: 'http://localhost:3000'
-            })
-        });
-
-        const tokenData = await tokenResponse.json();
-
-        const userResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${tokenData.access_token}` }
-        });
-        const googleUser = await userResponse.json();
-        const existingUser = await db.query('SELECT * FROM users WHERE email = $1', [googleUser.email]);
-        if (existingUser.rows.length > 0) {
-            // falls der user existiert aber noch keine google_id hat wissen wir dass er sich über die webseite schonmal registriert hat
-            if (!existingUser.rows[0].google_id) {
-                return res.status(409).json({ error: "Diese E-Mail ist bereits mit einem Plafin Account verknüpft. Bitte logge dich mit deinem Passwort ein." });
-            }
-        }
-        let userResult = await db.query('SELECT * FROM users WHERE google_id = $1', [googleUser.sub]);
-
-        if (userResult.rows.length === 0) {
-            const insertQuery = 'INSERT INTO users (username, email, google_id, avatar_url) VALUES ($1, $2, $3, $4) RETURNING *';
-            userResult = await db.query(insertQuery, [googleUser.name, googleUser.email, googleUser.sub, googleUser.picture]);
-        }else {
-            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE google_id = $2 RETURNING *';
-            userResult = await db.query(updateQuery, [googleUser.picture, googleUser.sub]);        }
-        req.session.user = {
-            id: userResult.rows[0].id,
-            username: userResult.rows[0].username,
-            loginMethod: 'google',
-            avatar_url: userResult.rows[0].avatar_url,
-        };
-        res.status(200).json({ success: true });
-
-    } catch (err) {
-        console.error("Fehler beim Google-Login:", err);
-        res.status(500).json({ error: "Google-Authentifizierung fehlgeschlagen" });
-    }
-});
 app.post("/forgot-password", async (req, res) => {
     const { email } = req.body;
 
@@ -366,162 +265,6 @@ app.post("/reset-password", async (req, res) => {
 });
 
 
-//-----------------------------------------------------------FOR DISCORD-------------------------------------------------------------------------------------
-//exchange code for access token
-//async because it needs to wait for an exteral server
-app.post('/auth/discord', async (req, res) => {
-    try {
-        const tokenResponseData = await fetch('https://discord.com/api/oauth2/token', {
-            method: 'POST',
-            body: new URLSearchParams({
-                client_id: config.discord_Client_ID,
-                client_secret: config.discord_Client_Secret,
-                code: req.body.code,
-                grant_type: 'authorization_code',
-                redirect_uri: "http://localhost:3000",
-                scope: 'identify',
-            }).toString(),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        });
-
-        const oAuthData = await tokenResponseData.json();
-
-        if (!oAuthData.access_token) {
-            return res.status(400).json({ error: "Could not get Discord token" });
-        }
-
-        // User von Discord abrufen
-        const me = await fetch('https://discord.com/api/users/@me', {
-            headers: {
-                authorization: `${oAuthData.token_type} ${oAuthData.access_token}`,
-            },
-        });
-
-        const discordUser = await me.json();
-
-        // 1. Avatar-URL berechnen
-        const avatarUrl = discordUser.avatar
-            ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
-            : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0') % 5}.png`;
-
-        // 2. User in DB suchen
-        let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
-
-        if (userResult.rows.length === 0) {
-            // Neuer Discord User: INSERT
-            const insertQuery = `
-                INSERT INTO users (username, discord_id, avatar_url) 
-                VALUES ($1, $2, $3) 
-                RETURNING *;
-            `;
-            userResult = await db.query(insertQuery, [discordUser.username, discordUser.id, avatarUrl]);
-            console.log("New Discord User saved:", discordUser.username);
-        } else {
-            // Bekannter User: UPDATE (falls sich das Profilbild geändert hat)
-            const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE discord_id = $2 RETURNING *';
-            userResult = await db.query(updateQuery, [avatarUrl, discordUser.id]);
-            console.log("Known Discord User logged in:", discordUser.username);
-        }
-
-        // 3. Session mit avatar_url erstellen
-        const user = userResult.rows[0];
-        req.session.user = {
-            id: user.id,
-            username: user.username,
-            avatar_url: user.avatar_url,
-            loginMethod: 'discord'
-        };
-
-        res.status(200).json({ success: true });
-    } catch (err) {
-        console.error("Discord Auth failed: " + err);
-        res.status(500).json({ error: "Internal Server Error during Discord authentication" });
-    }
-});
-
-//exchange access Token for user
-//combined with other method above
-//app.get("/p/getDiscordUser", async (req, res) => {
-//    const authString = req.headers.authorization;
-//    const me = await fetch('https://discord.com/api/users/@me', {
-//        headers: {
-//            authorization: authString,
-//        },
-//    })
-//    if (!me.ok) {
-//        return false;
-//    }
-//    const response = await me.json();
-//
-//    const {id, username} = response;
-//    const coins = memory[id] || 0
-//    if (!coins) { memory[id] = 0 }
-//    const user = { id, username, coins }
-//    res.json(user)
-//});
-
-
-// group endpoints later
-
-//app.delete('/api/users/:id')  Delete Users
-//app.get('/api/groups')        Get groups
-//app.post('/api/groups')       Create group
-//app.put('/api/groups:id')     Update group
-//app.delete('/api/groups/:id') Delete group
-
-
-//get groups
-//SELECT * FROM groups
-//Now also can search for specific games
-app.get("/groups", async (req, res) => {
-    const filterGame = req.query.game;
-    const filterTag = req.query.tags;
-
-    try{
-        let query = `
-            SELECT 
-                id, 
-                game,
-                title, 
-                description, 
-                max_players, 
-                current_players, 
-                creator_username,
-                tags,
-                image_url
-            FROM groups
-        `;
-        let filters = [];
-        let values = [];
-
-        //gesucht nach Spiel
-        if (filterGame) {
-            values.push(filterGame);
-            filters.push(`game = $${values.length}`);
-        }
-        //gesucht nach Tag
-        if(filterTag) {
-            values.push(`%${filterTag}%`);
-            filters.push(`tags ILIKE $${values.length}`);
-        }
-
-        //Wenn filter wird AND eingefügt
-        if(filters.length > 0){
-            query += ` WHERE ` + filters.join(' AND ');
-        }
-
-        query += ` ORDER BY id DESC;`;
-
-        const result = await db.query(query, values);
-        res.status(200).json(result.rows);
-    }catch(err){
-        console.error("Error fetching groups from database:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-});
-
 //Get Games endpoint für erstansicht der Gruppen am dashboard
 app.get("/games/load", async (req, res) => {
     try{
@@ -544,207 +287,6 @@ app.get("/games/load", async (req, res) => {
     }
 })
 
-//create groups
-app.post("/groups", requiredLogin, async (req, res) => {
-    const creator_username = req.session.user.username;
-    const creator_id = req.session.user.id;
-    const {game, title, description, max_players, tags} = req.body;
-
-    if(!game || !description || !max_players){
-        return res.status(400).json({error: "Please fill out all the fields."});
-    }
-
-    const safeTags = tags ? tags.trim() : "";
-
-    const checkUser = await db.query('SELECT user_id FROM group_members WHERE user_id = $1', [creator_id])
-    const checkGame = await db.query('SELECT image_url FROM games WHERE name = $1', [game.trim()]);
-
-    if (checkGame.rowCount === 0) {
-        return res.status(400).json({
-            error: "This game does not exist yet"
-        })
-    }
-
-    if(checkUser.rowCount !== 0){
-        return res.status(400).json({
-            error: "You are already in a lobby"
-        })
-    }
-
-    const imageUrl = checkGame.rows[0].image_url;
-
-    try{
-        const query = `
-        INSERT INTO groups (game, title, description, max_players, creator_username, tags, image_url)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, title, game, description, max_players, current_players, creator_username, tags, image_url
-        `;
-        const values = [game.trim(), title.trim(), description.trim(), parseInt(max_players), creator_username, safeTags, imageUrl];
-        const result = await db.query(query, values);
-
-        const newGroup = await result.rows[0];
-
-        const creatorId = req.session.user.id;
-        await db.query(
-            'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)',
-            [newGroup.id, creatorId]
-        );
-
-        res.status(200).json({success: true, group: result.rows[0]});
-    }catch (err){
-        console.error("Error creating group:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
-
-app.delete("/groups/:id", requiredLogin, async (req, res) => {
-    const groupId = parseInt(req.params.id);
-    const username = req.session.user.username;
-
-    try{
-        const query = `
-            DELETE FROM groups 
-            WHERE id = $1 AND creator_username = $2 
-            RETURNING id;
-        `;
-
-        const values = [groupId, username];
-        const result = await db.query(query, values);
-
-        if(result.rowCount === 0){
-            return res.status(404).json({error: "Could not find group"});
-        }
-
-        res.status(200).json({success: true, message: "Group deleted successfully."});
-    }catch(err){
-        console.error("Error deleting group:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
-
-app.put("/groups/:id", requiredLogin, async (req, res) => {
-    const groupId = parseInt(req.params.id, 10);
-    const {game, description, max_players} = req.body;
-    const creator_username = req.session.user.username;
-
-    try{
-        const query = `
-            UPDATE groups 
-            SET 
-                game = COALESCE($1, game),
-                description = COALESCE($2, description),
-                max_players = COALESCE($3, max_players)
-            WHERE id = $4 AND creator_username = $5
-            RETURNING id, game, description, max_players, current_players, creator_username;
-        `;
-
-        const values = [game || null, description || null, max_players ? parseInt(max_players) : null, groupId, creator_username];
-        const result = await db.query(query, values);
-
-        if(result.rowCount === 0){
-            return res.status(404).json({error: "Could not find group"});
-        }
-
-        res.status(200).json({success: true, group: result.rows[0], message: "Group updated successfully."});
-    }catch(err){
-        console.error("Error update group:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
-
-app.post("/groups/:id/join", requiredLogin, async (req, res) => {
-    const groupId = parseInt(req.params.id, 10);
-    const userId = req.session.user.id;
-
-    try{
-        const result = await db.query('SELECT * FROM groups WHERE id = $1', [groupId]);
-        const group = result.rows[0];
-
-        if(!group){
-            return res.status(404).json({error: "Could not find group"});
-        }
-
-        if(group.current_players >= group.max_players){
-            return res.status(400).json({error: "Group is full!"});
-        }
-
-        try{
-          await db.query('INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)', [groupId, userId]);
-        }catch(err){
-            //23505 Postgres besonderer Fehler "Unique Violation", bedeutet für uns das der user schon in dieser gruppe ist
-            if(err.code === '23505'){
-                return res.status(400).json({error: "You already joined a group!"});
-            }
-            throw err;
-        }
-        const query = `
-            UPDATE groups 
-            SET current_players = current_players + 1
-            WHERE id = $1
-            RETURNING id, game, description, max_players, current_players;
-        `;
-
-        const updatedGroup = await db.query(query, [group.id]);
-
-        io.to(groupId.toString()).emit('updatePlayerList')
-
-        io.emit('lobbiesChanged');
-
-        res.status(200).json({success: true, message: "You successfully joined the group!", group: updatedGroup.rows[0]});
-
-    }catch(err){
-        console.error("Error joining group:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
-
-app.delete("/groups/:id/leave", requiredLogin, async (req, res) => {
-    const groupId = parseInt(req.params.id, 10);
-    const userId = req.session.user.id;
-
-
-    try{
-        const result = await db.query('SELECT * FROM groups WHERE id = $1', [groupId]);
-
-        if(result.rowCount === 0){
-            return res.status(404).json({error: "Could not find group"});
-        }
-
-        const deleteResult = await db.query('DELETE FROM group_members WHERE group_id = $1 AND user_id = $2', [groupId, userId]);
-        if(deleteResult.rowCount === 0){
-            return res.status(404).json({error: "You are not in this group!"});
-        }
-        const query = `
-            UPDATE groups 
-            SET current_players = current_players - 1
-            WHERE id = $1
-            RETURNING id, game, description, max_players, current_players;
-        `;
-
-        const updatedGroup = await db.query(query, [groupId]);
-
-        const isEmpty = await db.query('SELECT current_players FROM groups WHERE id = $1',[groupId]);
-        const remainingPlayers = isEmpty.rows[0].current_players
-        if(remainingPlayers === 0){
-            const query = `
-            DELETE FROM groups 
-            WHERE id = $1
-            `;
-
-            await db.query(query, [groupId]);
-        }
-
-        io.to(groupId.toString()).emit('updatePlayerList')
-
-        io.emit('lobbiesChanged');
-
-        res.status(200).json({success: true, message: "You successfully left the group!", group: updatedGroup.rows[0]});
-
-    }catch(err){
-        console.error("Error leaving group:", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
 
 app.get("/games/search", requiredLogin, async (req, res) => {
     const searchQuery = req.query.q;
@@ -800,47 +342,8 @@ app.get("/games/search", requiredLogin, async (req, res) => {
     }
 })
 
-app.get("/groups/:id/members", requiredLogin, async (req, res) => {
-    const groupId = parseInt(req.params.id, 10);
-    try{
-        const query = `
-        SELECT users.id, users.username, group_members.joined_at
-        FROM group_members
-        JOIN users ON group_members.user_id = users.id
-        WHERE group_members.group_id = $1
-        ORDER BY group_members.joined_at ASC;
-        `;
-        const result = await db.query(query, [groupId]);
-        res.status(200).json(result.rows);
-    }catch(err){
-        console.error("Error fetching group members", err);
-        res.status(500).json({error: "Internal Server Error"});
-    }
-})
 
 
-app.get("/groups/:id/info", requiredLogin, async (req, res) => {
-    try {
-        const result = await db.query('SELECT * FROM groups WHERE id = $1', [req.params.id]);
-        if (result.rowCount === 0) return res.status(404).json({error: "Lobby not found"});
-        res.status(200).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({error: "Internal Server Error"});
-    }
-});
-
-app.get("/user/current-group", requiredLogin, async (req, res) => {
-    try {
-        const result = await db.query('SELECT group_id FROM group_members WHERE user_id = $1', [req.session.user.id]);
-        if (result.rowCount > 0) {
-            res.status(200).json({ groupId: result.rows[0].group_id });
-        } else {
-            res.status(200).json({ groupId: null });
-        }
-    } catch (err) {
-        res.status(500).json({ error: "Server Error" });
-    }
-});
 
 
 app.delete("/deleteAccount", requiredLogin, async (req, res) => {
@@ -957,7 +460,20 @@ app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, r
 });
 
 
-// Wir nutzen server.listen() statt app.listen() da Socket.io direkten Zugriff auf den HTTP-Server benötigt um dauerhafte Live-Verbindungen (WebSockets) für den Chat aufzubauen
-server.listen(3000, () => {
-    console.log('Server running at http://localhost:3000');
+connectDB().then(client => {
+    db = client;
+    console.log("Datenbank verbunden!");
+
+    // 2. Jetzt mounten wir den Router. Da das ganz unten passiert,
+    // weiß der Router jetzt auch, dass es Sessions gibt und db ist befüllt!
+    app.use('/groups', groupsRoutes(db, io));
+    app.use('/auth', authRoutes(db, config))
+    app.use('/users', usersRoutes(db, io))
+    // 3. Server starten
+    server.listen(3000, () => {
+        console.log('Server running at http://localhost:3000');
+    });
+
+}).catch(err => {
+    console.error("Kritischer Fehler: Datenbank konnte nicht verbunden werden!", err);
 });
