@@ -17,7 +17,6 @@ const renderGames = async ()  => {
         const gameData = await response.json();
 
         let html = '';
-        // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
         gameData.forEach(g => {
             html += `
             <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.game)}'">
@@ -31,12 +30,97 @@ const renderGames = async ()  => {
                 </div>
             </div>`;
         });
-        // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
         grid.innerHTML = html;
     } catch (err) {
         console.error(err);
     }
 };
+
+async function loadFriendModal() {
+    const modalContent = document.getElementById('friendsModalContent');
+    if (!modalContent) return;
+    modalContent.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="friendUsername" placeholder="Username" style="width: 70%; padding: 8px; color: black;">
+            <button onclick="sendFriendRequest()">Add</button>
+        </div>
+        <hr>
+        
+        <h3>Your friends</h3>
+        <div id="friendsList">Load Friends...</div>
+        
+        <h3 style="margin-top: 20px;">Pending requests</h3>
+        <div id="requestsList">Load requests...</div>
+    `;
+    try {
+        const friendRes = await fetch('/friend/list');
+        const friends = await friendRes.json();
+        const friendsDiv = document.getElementById('friendsList');
+
+        friendsDiv.innerHTML = friends.length > 0
+            ? friends.map(f => `<div style="padding: 8px; border-bottom: 1px solid #444;">${f.username}</div>`).join('')
+            : '<p>No friends, loser :(.</p>';
+    } catch (err) {
+        console.error("error at loading friends:", err);
+    }
+    try {
+        const reqRes = await fetch('/friend/requests');
+        const requests = await reqRes.json();
+        const reqDiv = document.getElementById('requestsList');
+
+        if (requests.length === 0) {
+            reqDiv.innerHTML = '<p>no pending requests.</p>';
+        } else {
+            reqDiv.innerHTML = requests.map(req => `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 10px; padding: 10px; background: #3b3b46; border-radius: 5px;">
+                    <span>${req.sender_name}</span>
+                    <div>
+                        <button onclick="respondToRequest(${req.id}, 'accept')">accept</button>
+                        <button onclick="respondToRequest(${req.id}, 'decline')">decline</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error("error at loading friends:", err);
+    }
+}
+
+async function sendFriendRequest() {
+    const username = document.getElementById('friendUsername').value;
+    const response = await fetch('/friend/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiverUsername: username })
+    });
+
+    if (response.ok) {
+        alert("Request sent!");
+        loadFriendModal();
+    } else {
+        const data = await response.json();
+        alert(data.error);
+    }
+}
+
+async function respondToRequest(requestId, action) {
+    const method = action === 'decline' ? 'DELETE' : 'POST';
+    const url = action === 'decline' ? `/friend/request/${requestId}` : `/friend/accept/${requestId}`;
+
+    try {
+        const response = await fetch(url, { method: method });
+        if (response.ok) {
+            alert("Done!");
+            loadFriendModal();
+        } else {
+            const data = await response.json();
+            alert(data.error || "Error at action.");
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 
 window.onload = async () => {
     // Rendert sofort die Spiele, wenn die Seite lädt
@@ -226,5 +310,15 @@ window.onload = async () => {
                 alert(data.error);
             }
         });
+    }
+
+    const fruendsIcon = document.getElementById('openFriendsModal');
+    const friendsModal = document.getElementById('friendsModal');
+
+    if (fruendsIcon && friendsModal) {
+        fruendsIcon.addEventListener('click', (e) => {
+            friendsModal.style.display = 'flex';
+            loadFriendModal();
+        })
     }
 };

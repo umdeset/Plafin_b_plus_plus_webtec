@@ -207,3 +207,8 @@ header h1 {
     display: inline-block;
     margin-right: 8px;
 }
+
+.icon-friends {
+    -webkit-mask-image: url('images/icons/friend_add.svg');
+    mask-image: url('images/icons/friend_add.svg');
+}

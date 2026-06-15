@@ -46,6 +46,15 @@ async function connectDB() {
                 joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (group_id, user_id)
             );
+            
+            CREATE TABLE IF NOT EXISTS friend_requests (
+            id SERIAL PRIMARY KEY,
+            sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'accepted'
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(sender_id, receiver_id)
+            );
         `);
         await client.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS last_username_change TIMESTAMP;
