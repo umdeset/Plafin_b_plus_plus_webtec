@@ -105,4 +105,12 @@ window.onload = async () => {
             console.error(err);
         }
     });
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            await fetch("/logout");
+            location.replace('/');
+        });
+    }
 };

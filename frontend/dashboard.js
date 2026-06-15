@@ -47,7 +47,7 @@ window.onload = async () => {
         const response = await fetch('/session');
         if (!response.ok) { window.location.href = '/'; return; }
         currentSession = await response.json();
-        document.getElementById('info').innerText = "Welcome : " + currentSession.username + " !";
+        document.getElementById('greeting').innerText = "Welcome : " + currentSession.username + " !";
     } catch (err) {
         window.location.href = '/';
     }
