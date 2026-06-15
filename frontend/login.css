@@ -1,28 +1,55 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #1e1e24; /* Dark background */
     color: #ffffff;
+
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     align-items: center;
-    height: 100vh;
+
+    min-height: 100vh;
     margin: 0;
+
+    padding: 40px clamp(40px, 8vw, 160px) 40px 40px;
+    box-sizing: border-box;
+
+    background:
+            linear-gradient(
+                    rgba(5, 8, 20, 0.35),
+                    rgba(5, 8, 20, 0.55)
+            ),
+            url("images/games/Plafin.png");
+
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-color: #050814;
 }
 
-.login-container, .register-container {
-    background-color: #2b2b36;
-    padding: 40px;
-    border-radius: 10px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    width: 100%;
-    max-width: 320px;
-    text-align: center;
+.login-container,
+.register-container {
+    background: rgba(15, 18, 35, 0.80);
+    backdrop-filter: blur(12px);
+
+    border: 1px solid rgba(88, 101, 242, 0.25);
+    border-radius: 18px;
+
+    box-shadow:
+            0 10px 35px rgba(0,0,0,0.55),
+            0 0 25px rgba(88,101,242,0.20);
+
+    width: min(90vw, 380px);
+    padding: 25px;
+
+    margin-top: clamp(-120px, -8vh, -40px);
+
+    transform: translateX(50px);
 }
 
-.login-container h2, .register-container h2 {
-    margin-top: 0;
-    margin-bottom: 25px;
-    font-size: 24px;
+.login-container h2,
+.register-container h2 {
+    color: #ffffff;
+    letter-spacing: 0.5px;
+    text-shadow: 0 0 18px rgba(88, 101, 242, 0.6);
 }
 
 /* Form inputs */
@@ -40,7 +67,7 @@ body {
 
 .input-group input {
     width: 100%;
-    padding: 12px;
+    padding: 15px;
     border: 1px solid #444;
     border-radius: 6px;
     background-color: #1e1e24;
@@ -56,7 +83,7 @@ body {
 
 .btn {
     width: 100%;
-    padding: 12px;
+    padding: 15px;
     margin-bottom: 12px;
     border: none;
     border-radius: 6px;
@@ -72,6 +99,18 @@ body {
 }
 
 .btn-login:hover { background-color: #45a049; }
+
+.forgot-link {
+    color: #9db0ff;
+    text-decoration: none;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.forgot-link:hover {
+    color: white;
+    text-shadow: 0 0 10px rgba(88,101,242,0.7);
+}
 
 .btn-register {
     background-color: transparent;
@@ -110,6 +149,28 @@ body {
 }
 .register-container {
     display: none;
+}
+@media (max-width: 1200px) {
+    .login-container,
+    .register-container {
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 900px) {
+    body {
+        justify-content: center;
+        padding: 30px;
+        background-size: cover;
+    }
+
+    .login-container,
+    .register-container {
+        margin-top: 0;
+        width: 100%;
+        max-width: 430px;
+        transform: translateX(0);
+    }
 }
 .divider:not(:empty)::before { margin-right: 15px; }
 .divider:not(:empty)::after { margin-left: 15px; }

@@ -49,6 +49,7 @@ const checkNormalSession = async () => {
     }
 }
 
+
 //-----------------------------------------------Onload/Initialization------------------------------------------------------------
 
 window.onload = async () => {
@@ -59,6 +60,7 @@ window.onload = async () => {
     const backToLoginBtn = document.getElementById("backToLoginBtn");
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
+    const forgotPasswordLink = document.getElementById("forgotPasswordLink");
 
     //switch to register
     if(registerButton) {
@@ -128,6 +130,40 @@ window.onload = async () => {
                 alert(err);
             }
         })
+    }
+    // Forgot Password
+
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener("click", async (e) => {
+            e.preventDefault();
+
+            const email = prompt("Enter your email address:");
+
+            if (!email) {
+                return;
+            }
+
+            try {
+                const response = await fetch("/forgot-password", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert(data.message);
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                console.error("Forgot password error:", err);
+                alert("Server error. Please try again later.");
+            }
+        });
     }
 
     //Checks if already logged in normaly
