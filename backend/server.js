@@ -31,7 +31,6 @@ io.on('connection', (socket) => {
 
 // Parse urlencoded bodies
 app.use(express.json())
-app.use(express.static(path.join(__dirname, '../frontend')));
 let db;
 connectDB().then(client => {
     db = client;
@@ -56,6 +55,32 @@ app.use(session({
 //required login so people are not allowed to make Post requests without being logged in
 //middleware
 //used for post methods
+app.get('/lobbies.html', (req, res) => {
+    if(req.session.user) {
+        res.sendFile(path.join(__dirname, '../frontend/lobbies.html'));
+    }else{
+        res.redirect('/');
+    }
+});
+
+
+app.get('/dashboard', (req, res) => {
+    if(req.session.user) {
+        res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
+    }else{
+        res.redirect('/');
+    }
+});
+
+app.get('/lobby-room.html', (req, res) => {
+    if(req.session.user) {
+        res.sendFile(path.join(__dirname, '../frontend/lobby-room.html'));
+    }else{
+        res.redirect('/');
+    }
+});
+
+app.use(express.static(path.join(__dirname, '../frontend')));
 const requiredLogin = (req, res, next) => {
     if(req.session.user) {
         next();
@@ -67,6 +92,12 @@ const requiredLogin = (req, res, next) => {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/login.html'));
 });
+
+app.get('/groups/:game', requiredLogin, (req, res) => {
+    const game = req.params.game;
+    res.redirect(path.join(`/lobbies.html?game=${encodeURIComponent(game)}`));
+
+})
 
 app.get('/groups/:game', requiredLogin, (req, res) => {
     const game = req.params.game;
@@ -110,15 +141,6 @@ app.get("/session", function (req, res) {
         res.send(req.session.user);
     } else {
         res.status(401).json(null);
-    }
-});
-
-
-app.get('/dashboard',requiredLogin, (req, res) => {
-    if(req.session.user) {
-        res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
-    }else{
-        res.redirect('/');
     }
 });
 
@@ -666,6 +688,10 @@ app.post("/groups/:id/join", requiredLogin, async (req, res) => {
 
         const updatedGroup = await db.query(query, [group.id]);
 
+        io.to(groupId.toString()).emit('updatePlayerList')
+
+        io.emit('lobbiesChanged');
+
         res.status(200).json({success: true, message: "You successfully joined the group!", group: updatedGroup.rows[0]});
 
     }catch(err){
@@ -699,6 +725,10 @@ app.delete("/groups/:id/leave", requiredLogin, async (req, res) => {
         `;
 
         const updatedGroup = await db.query(query, [groupId]);
+
+        io.to(groupId.toString()).emit('updatePlayerList')
+
+        io.emit('lobbiesChanged');
 
         res.status(200).json({success: true, message: "You successfully left the group!", group: updatedGroup.rows[0]});
 

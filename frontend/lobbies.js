@@ -1,3 +1,4 @@
+const socket = io();
 let isFirstLoad = true;
 // Holt alle Lobbies vom Server und filtert sie im Frontend
 async function loadLobbies() {
@@ -251,7 +252,7 @@ window.onload = async () => {
 
             document.querySelectorAll('.search-item').forEach(searchResult => {
                 if(!searchResult.dataset.gamename) return;
-                searchResult.addEventListener('click', (e) => {
+                searchResult.addEventListener('click', () => {
                     gameInput.value = searchResult.dataset.gamename;
                     hiddenGameInput.value = searchResult.dataset.gamename;
                     searchResults.style.display = 'none';
@@ -374,5 +375,9 @@ window.onload = async () => {
     } catch(err) {
         console.error("Fehler beim Laden der aktiven Lobby:", err);
     }
+
+    socket.on('lobbiesChanged', async () => {
+        await loadLobbies();
+    })
 
 };

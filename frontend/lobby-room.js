@@ -34,7 +34,6 @@ window.onload = async () => {
     const sessionRes = await fetch('/session');
     if (!sessionRes.ok) { window.location.href = '/'; return; }
     currentSession = await sessionRes.json();
-
     // Raum ID aus der URL holen (?id=5)
     const urlParams = new URLSearchParams(window.location.search);
     roomId = urlParams.get('id');
@@ -47,6 +46,10 @@ window.onload = async () => {
     // Raumdaten laden und Socket beitreten
     await loadRoomData();
     socket.emit('joinRoom', roomId);
+
+    socket.on('updatePlayerList', async () => {
+        await loadRoomData();
+    })
 
     // Chat Logik
     const chatForm = document.getElementById('chatForm');
