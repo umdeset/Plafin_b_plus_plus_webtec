@@ -1,0 +1,153 @@
+.room-layout {
+    display: flex;
+    gap: 20px;
+    height: 100vh;
+    padding: 20px 40px;
+    box-sizing: border-box;
+}
+
+/* Chat Bereich (Links) */
+.chat-section {
+    flex: 1;
+    background-color: #1e1e24;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 4px solid #5865F2;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.chat-message {
+    background-color: #2b2b36;
+    padding: 12px 16px;
+    border-radius: 8px;
+    max-width: 80%;
+    align-self: flex-start;
+}
+
+.chat-message.self {
+    background-color: #4da6ff;
+    color: white;
+    align-self: flex-end;
+}
+
+.chat-message strong {
+    display: block;
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+.chat-message.self strong {
+    color: #e0e0e0;
+}
+
+.chat-input-area {
+    display: flex;
+    padding: 20px;
+    background-color: #1a1a24;
+    gap: 10px;
+}
+
+.chat-input-area input {
+    flex: 1;
+    padding: 15px;
+    background-color: #2b2b36;
+    border: 1px solid #444;
+    color: white;
+    border-radius: 8px;
+    outline: none;
+}
+
+.btn-send {
+    background-color: #5865F2;
+    color: white;
+    border: none;
+    padding: 0 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Info Bereich (Rechts) */
+.info-section {
+    width: 300px;
+    background-color: #1e1e24;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-section h2 {
+    margin: 0 0 15px 0;
+    font-size: 20px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 15px;
+}
+
+.player-count-box {
+    display: flex;
+    justify-content: space-between;
+    font-size: 16px;
+    margin-bottom: 25px;
+    color: #aaa;
+}
+
+.online-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.online-list h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    color: #8b8d96;
+}
+
+.online-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.online-list li {
+    padding: 8px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+}
+
+.online-list li::before {
+    content: "•";
+    color: #4CAF50;
+    font-weight: bold;
+    display: inline-block;
+    width: 15px;
+}
+
+.btn-leave {
+    background-color: transparent;
+    color: #DB4437;
+    border: 1px solid #DB4437;
+    padding: 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: 0.2s;
+}
+
+.btn-leave:hover {
+    background-color: #DB4437;
+    color: white;
+}

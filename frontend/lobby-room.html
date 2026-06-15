@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plafin - Lobby Room</title>
+  <link href="dashboard.css" rel="stylesheet">
+  <link href="lobby-room.css" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="lobby-room.js" defer></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">PLAFIN</div>
+  <div class="menu">
+    <a href="/dashboard" class="nav-btn"><span class="icon icon-grid"></span></a>
+    <a href="/lobbies.html" class="nav-btn"><span class="icon icon-controller"></span></a>
+  </div>
+  <button id="logoutBtn" class="logout-btn"><span class="icon icon-logout"></span></button>
+</div>
+
+<div class="main-content room-layout">
+  <div class="chat-section">
+    <div class="chat-messages" id="chatMessages">
+    </div>
+    <form id="chatForm" class="chat-input-area">
+      <input type="text" id="chatInput" placeholder="Hier die Nachricht fürs Senden" autocomplete="off" required>
+      <button type="submit" class="btn-send">Send</button>
+    </form>
+  </div>
+
+  <div class="info-section">
+    <h2 id="roomTitle">Loading...</h2>
+    <div class="player-count-box">
+      <span>Player</span>
+      <span id="roomPlayerCount">0/0</span>
+    </div>
+
+    <div class="online-list">
+      <h3>Online:</h3>
+      <ul id="memberList">
+      </ul>
+    </div>
+
+    <button id="leaveLobbyBtn" class="btn-leave">Leave Lobby</button>
+  </div>
+</div>
+
+</body>
+</html>

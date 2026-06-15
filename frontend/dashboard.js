@@ -176,4 +176,19 @@ window.onload = async () => {
             profileModal.style.display = 'flex';
         });
     }
+
+    try {
+        const groupRes = await fetch('/user/current-group');
+        if (groupRes.ok) {
+            const groupData = await groupRes.json();
+            const activeLobbyBtn = document.getElementById('activeLobbyBtn');
+            if (groupData.groupId && activeLobbyBtn) {
+                activeLobbyBtn.style.display = 'flex'; // Button sichtbar machen
+                activeLobbyBtn.href = `/lobby-room.html?id=${groupData.groupId}`; // Link zur aktiven Lobby setzen
+            }
+        }
+    } catch(err) {
+        console.error("Fehler beim Laden der aktiven Lobby:", err);
+    }
+
 };

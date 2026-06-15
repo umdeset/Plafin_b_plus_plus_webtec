@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 //node:path tells node.js to ignore the node_modules folder
 const path = require('node:path');
 const session = require("express-session");
@@ -7,6 +9,21 @@ const FileStore = require('session-file-store')(session);
 const bcrypt = require("bcrypt");
 const connectDB = require('./db-connection.js');
 const app = express();
+
+const server = http.createServer(app);
+const io = new Server(server);
+
+// Live-Chat Logik
+io.on('connection', (socket) => {
+    socket.on('joinRoom', (roomId) => {
+        socket.join(roomId);
+    });
+
+    socket.on('chatMessage', (data) => {
+        // Sendet die Nachricht an alle in diesem Raum
+        io.to(data.roomId).emit('message', data);
+    });
+});
 
 // Parse urlencoded bodies
 app.use(express.json())
@@ -634,7 +651,7 @@ app.get("/groups/:id/members", requiredLogin, async (req, res) => {
         SELECT users.id, users.username, group_members.joined_at
         FROM group_members
         JOIN users ON group_members.user_id = users.id
-        WHERE group_members.id = $1
+        WHERE group_members.group_id = $1
         ORDER BY group_members.joined_at ASC;
         `;
         const result = await db.query(query, [groupId]);
@@ -644,6 +661,31 @@ app.get("/groups/:id/members", requiredLogin, async (req, res) => {
         res.status(500).json({error: "Internal Server Error"});
     }
 })
+
+
+app.get("/groups/:id/info", requiredLogin, async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM groups WHERE id = $1', [req.params.id]);
+        if (result.rowCount === 0) return res.status(404).json({error: "Lobby not found"});
+        res.status(200).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({error: "Internal Server Error"});
+    }
+});
+
+app.get("/user/current-group", requiredLogin, async (req, res) => {
+    try {
+        const result = await db.query('SELECT group_id FROM group_members WHERE user_id = $1', [req.session.user.id]);
+        if (result.rowCount > 0) {
+            res.status(200).json({ groupId: result.rows[0].group_id });
+        } else {
+            res.status(200).json({ groupId: null });
+        }
+    } catch (err) {
+        res.status(500).json({ error: "Server Error" });
+    }
+});
+
 
 app.delete("/deleteAccount", requiredLogin, async (req, res) => {
     const userId = req.session.user.id;
@@ -716,6 +758,8 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
     }
 });
 
-app.listen(3000, () => {
+
+// Wir nutzen server.listen() statt app.listen() da Socket.io direkten Zugriff auf den HTTP-Server benötigt um dauerhafte Live-Verbindungen (WebSockets) für den Chat aufzubauen
+server.listen(3000, () => {
     console.log('Server running at http://localhost:3000');
 });

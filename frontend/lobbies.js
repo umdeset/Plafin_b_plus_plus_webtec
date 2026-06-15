@@ -133,8 +133,10 @@ async function joinLobby(groupId) {
         const data = await response.json();
 
         if(response.ok) {
-            alert("You joined the group!") //später wird mit verlinkung auf lobby ersetzt
-            await loadLobbies(groupId);
+
+            window.location.href = `/lobby-room.html?id=${groupId}`;
+            //alert("You joined the group!") //später wird mit verlinkung auf lobby ersetzt
+            //await loadLobbies(groupId);
         } else {
             alert(data.error);
         }
@@ -371,6 +373,20 @@ window.onload = async () => {
                 console.error("Logout Failed:  ", err);
             }
         });
+    }
+
+    try {
+        const groupRes = await fetch('/user/current-group');
+        if (groupRes.ok) {
+            const groupData = await groupRes.json();
+            const activeLobbyBtn = document.getElementById('activeLobbyBtn');
+            if (groupData.groupId && activeLobbyBtn) {
+                activeLobbyBtn.style.display = 'flex'; // Button sichtbar machen
+                activeLobbyBtn.href = `/lobby-room.html?id=${groupData.groupId}`; // Link zur aktiven Lobby setzen
+            }
+        }
+    } catch(err) {
+        console.error("Fehler beim Laden der aktiven Lobby:", err);
     }
 
 };
