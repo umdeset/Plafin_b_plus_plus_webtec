@@ -269,6 +269,35 @@ module.exports = (db, io) => {
         }
     });
 
+    router.delete("/:id/kick/:userId", requiredLogin, async (req, res) => {
+        const groupId = parseInt(req.params.id, 10);
+        const targetUserId = parseInt(req.params.userId);
+        const currentUsername = req.session.user.username;
+
+        try{
+            const result = await db.query('SELECT * FROM groups WHERE id = $1', [groupId]);
+            if(result.rowCount === 0) return res.status(404).json({error: "Could not find group"});
+            const group = result.rows[0];
+
+            if(group.creator_username !== currentUsername){
+                return res.status(403).json({error: "Only the Lobby-Creator is allowed to kick players"});
+            }
+
+            const deleteResult = await db.query('DELETE FROM group_members WHERE group_id  = $1 AND user_id = $2', [groupId, targetUserId]);
+            if(deleteResult.rowCount === 0) return res.status(404).json({error: "Player is not in this group!"});
+
+            await db.query('UPDATE groups SET current_players = current_players - 1 WHERE id = $1', [groupId]);
+
+            io.to(groupId.toString()).emit('updatePlayerList');
+            io.emit('lobbiesChanged');
+
+            res.status(200).json({success: true, message: "Player kicked"});
+        } catch(err) {
+            console.error("Error kicking player: ", err);
+            res.status(500).json({error: "Internal Server Error"});
+        }
+    })
+
     router.get("/:id/members", requiredLogin, async (req, res) => {
         const groupId = parseInt(req.params.id, 10);
         try{

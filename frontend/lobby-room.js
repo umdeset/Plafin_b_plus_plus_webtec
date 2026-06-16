@@ -27,26 +27,34 @@ async function loadRoomData() {
         const membersRes = await fetch(`/groups/${roomId}/members`);
         const members = await membersRes.json();
 
+        const stillInLobby = members.some(member => member.username === currentSession.username);
+        if(!stillInLobby) {
+            alert("You have been kicked from the Lobby!");
+            window.location.href = "/lobbies.html";
+            return;
+        }
+
         const memberList = document.getElementById('memberList');
         memberList.innerHTML = '';
+
+        const creator = currentSession.username === roomInfo.creator_username;
+
         members.forEach(member => {
-            if(member.id === currentSession.id){
-                memberList.innerHTML += `
-                <li>
-                    <span class="member-name">${member.username}</span>
-                </li>`;
-            }else {
-                memberList.innerHTML += `
-                <li>
-                    <span class="member-name">${member.username}</span>
-                    <button class="btn-kick">Kick</button>
-                </li>`;
+            let kickButtonHtml = '';
+
+            if(creator && member.username !== currentSession.username) {
+                kickButtonHtml = `<button class="btn-kick" onclick="kickPlayer(${member.id})">Kick</button>`;
             }
+            memberList.innerHTML += `
+            <li>
+                <span class="member-name">${member.username}</span>
+                ${kickButtonHtml}
+            </li>`;
         });
 
     } catch (err) {
         console.error(err);
-        alert("Lobby existiert nicht mehr.");
+        alert("Lobby does not exist anymore.");
         window.location.href = "/lobbies.html";
     }
 }
@@ -126,7 +134,7 @@ window.onload = async () => {
             if (leaveRes.ok) {
                 window.location.href = "/lobbies.html";
             } else {
-                alert("Fehler beim Verlassen der Lobby.");
+                alert("Error leaving Lobby!");
             }
         } catch (err) {
             console.error(err);
@@ -178,7 +186,24 @@ window.onload = async () => {
                 alert(errorData.error);
             }
         }catch(err) {
-            console.error("Fehler beim Updaten der Lobby: ", err);
+            console.error("Error updating Lobby: ", err);
         }
     });
+
+    window.kickPlayer = async function(userId) {
+        if(!confirm("Do you really want to kick this player?")) return;
+
+        try{
+            const response = await fetch(`/groups/${roomId}/kick/${userId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                alert(data.error);
+            }
+        }catch(err){
+            console.error("Error kicking Player: ", err);
+        }
+    }
 };
