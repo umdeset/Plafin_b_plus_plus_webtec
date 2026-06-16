@@ -39,6 +39,8 @@ const renderGames = async ()  => {
 async function loadFriendModal() {
     const modalContent = document.getElementById('friendsModalContent');
     if (!modalContent) return;
+
+    // 1. Grundgerüst des Modals
     modalContent.innerHTML = `
         <div style="margin-bottom: 20px;">
             <input type="text" id="friendUsername" placeholder="Username" style="width: 70%; padding: 8px; color: black;">
@@ -47,11 +49,13 @@ async function loadFriendModal() {
         <hr>
         
         <h3>Your friends</h3>
-        <div id="friendsList">Load Friends...</div>
+        <div id="friendsList">Loading friends...</div>
         
         <h3 style="margin-top: 20px;">Pending requests</h3>
-        <div id="requestsList">Load requests...</div>
+        <div id="requestsList">Loading requests...</div>
     `;
+
+    // 2. Freunde laden
     try {
         const friendRes = await fetch('/friend/list');
         const friends = await friendRes.json();
@@ -61,28 +65,41 @@ async function loadFriendModal() {
             ? friends.map(f => `<div style="padding: 8px; border-bottom: 1px solid #444;">${f.username}</div>`).join('')
             : '<p>No friends, loser :(.</p>';
     } catch (err) {
-        console.error("error at loading friends:", err);
+        console.error("Error at loading friends:", err);
     }
+
+    // 3. Anfragen laden
     try {
         const reqRes = await fetch('/friend/requests');
         const requests = await reqRes.json();
         const reqDiv = document.getElementById('requestsList');
 
         if (requests.length === 0) {
-            reqDiv.innerHTML = '<p>no pending requests.</p>';
+            reqDiv.innerHTML = '<p>No pending requests.</p>';
         } else {
-            reqDiv.innerHTML = requests.map(req => `
-                <div style="display:flex; justify-content:space-between; margin-bottom: 10px; padding: 10px; background: #3b3b46; border-radius: 5px;">
-                    <span>${req.sender_name}</span>
-                    <div>
-                        <button onclick="respondToRequest(${req.id}, 'accept')">accept</button>
-                        <button onclick="respondToRequest(${req.id}, 'decline')">decline</button>
-                    </div>
-                </div>
-            `).join('');
+            reqDiv.innerHTML = requests.map(req => {
+                // Logik: Ist der eingeloggte User der Empfänger?
+                const isReceiver = req.receiver_id === currentSession.id;
+
+                // Buttons je nach Rolle
+                const actions = isReceiver
+                    ? `<div> 
+                        <button onclick="respondToRequest(${req.id}, 'accept')">Accept</button> 
+                        <button onclick="respondToRequest(${req.id}, 'decline')">Decline</button> 
+                       </div>`
+                    : `<div> 
+                        <button onclick="respondToRequest(${req.id}, 'decline')">Cancel</button> 
+                       </div>`;
+
+                return `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 10px; padding: 10px; background: #3b3b46; border-radius: 5px;"> 
+                    <span>${isReceiver ? req.sender_name : 'To: ' + req.receiver_name}</span> 
+                    ${actions} 
+                </div>`;
+            }).join('');
         }
     } catch (err) {
-        console.error("error at loading friends:", err);
+        console.error("Error at loading requests:", err);
     }
 }
 

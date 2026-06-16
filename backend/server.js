@@ -968,36 +968,30 @@ app.post('/friend/request', requiredLogin, async (req, res) => {
 })
 
 app.get('/friend/requests', requiredLogin, async (req, res) => {
-    try {
-        const userId = req.session.user.id;
-        const query = `
-            SELECT fr.*, u.username as sender_name 
-            FROM friend_requests fr
-            JOIN users u ON fr.sender_id = u.id
-            WHERE fr.sender_id = $1 OR fr.receiver_id = $1`;
-        const result = await db.query(query, [userId]);
-        res.status(200).json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: "Server Error" });
-    }
+    const userId = req.session.user.id;
+    const query = `
+        SELECT fr.*, u1.username as sender_name, u2.username as receiver_name 
+        FROM friend_requests fr
+        JOIN users u1 ON fr.sender_id = u1.id
+        JOIN users u2 ON fr.receiver_id = u2.id
+        WHERE (fr.sender_id = $1 OR fr.receiver_id = $1)
+        AND fr.status = 'pending'`; // WICHTIG: Nur pending!
+    const result = await db.query(query, [userId]);
+    res.json(result.rows);
 });
 
+// server.js - Korrektur für DELETE
 app.delete('/friend/request/:id', requiredLogin, async (req, res) => {
     const requestId = req.params.id;
     const userId = req.session.user.id;
 
-    try {
-        const result = await db.query(
-            'DELETE FROM friend_requests WHERE id = $1 AND receiver_id = $2',
-            [requestId, userId]
-        );
+    const result = await db.query(
+        'DELETE FROM friend_requests WHERE id = $1 AND (sender_id = $2 OR receiver_id = $2)',
+        [requestId, userId]
+    );
 
-        if (result.rowCount === 0) return res.status(404).json({ error: "No such request existing." });
-
-        res.status(200).json({ message: "Request declined." });
-    } catch (err) {
-        res.status(500).json({ error: "Server Error" });
-    }
+    if (result.rowCount === 0) return res.status(404).json({ error: "Anfrage nicht gefunden." });
+    res.status(200).json({ message: "Erfolgreich gelöscht." });
 });
 
 app.post('/friend/accept/:id', requiredLogin, async (req, res) => {
