@@ -17,7 +17,6 @@ const renderGames = async ()  => {
         const gameData = await response.json();
 
         let html = '';
-        // Geht jedes Spiel im Array durch und baut den passenden HTML-Block dafür zusammen
         gameData.forEach(g => {
             html += `
             <div class="game-card" onclick="window.location.href='/lobbies.html?game=${encodeURIComponent(g.game)}'">
@@ -31,12 +30,110 @@ const renderGames = async ()  => {
                 </div>
             </div>`;
         });
-        // Klatscht den ganzen fertigen HTML-Code auf einmal ins Grid
         grid.innerHTML = html;
     } catch (err) {
         console.error(err);
     }
 };
+
+async function loadFriendModal() {
+    const modalContent = document.getElementById('friendsModalContent');
+    if (!modalContent) return;
+
+    modalContent.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="friendUsername" placeholder="Username" style="width: 70%; padding: 8px; color: black;">
+            <button onclick="sendFriendRequest()">Add</button>
+        </div>
+        <hr>
+        
+        <h3>Your friends</h3>
+        <div id="friendsList">Loading friends...</div>
+        
+        <h3 style="margin-top: 20px;">Sent requests</h3>
+        <div id="requestsList">Loading requests...</div>
+    `;
+
+    try {
+        const friendRes = await fetch('/friend/list');
+        const friends = await friendRes.json();
+        const friendsDiv = document.getElementById('friendsList');
+
+        friendsDiv.innerHTML = friends.length > 0
+            ? friends.map(f => `<div style="padding: 8px; border-bottom: 1px solid #444;">${f.username}</div>`).join('')
+            : '<p>No friends, loser :(.</p>';
+    } catch (err) {
+        console.error("Error at loading friends:", err);
+    }
+
+    try {
+        const reqRes = await fetch('/friend/requests');
+        const requests = await reqRes.json();
+        const reqDiv = document.getElementById('requestsList');
+
+        if (requests.length === 0) {
+            reqDiv.innerHTML = '<p>No pending requests.</p>';
+        } else {
+            reqDiv.innerHTML = requests.map(req => {
+                const isReceiver = req.receiver_id === currentSession.id;
+
+                // Buttons je nach Rolle
+                const actions = isReceiver
+                    ? `<div> 
+                        <button onclick="respondToRequest(${req.id}, 'accept')">Accept</button> 
+                        <button onclick="respondToRequest(${req.id}, 'decline')">Decline</button> 
+                       </div>`
+                    : `<div> 
+                        <button onclick="respondToRequest(${req.id}, 'decline')">Cancel</button> 
+                       </div>`;
+
+                return `
+                <div style="display:flex; justify-content:space-between; margin-bottom: 10px; padding: 10px; background: #3b3b46; border-radius: 5px;"> 
+                    <span>${isReceiver ? req.sender_name : req.receiver_name}</span> 
+                    ${actions} 
+                </div>`;
+            }).join('');
+        }
+    } catch (err) {
+        console.error("Error at loading requests:", err);
+    }
+}
+
+async function sendFriendRequest() {
+    const username = document.getElementById('friendUsername').value;
+    const response = await fetch('/friend/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiverUsername: username })
+    });
+
+    if (response.ok) {
+        alert("Request sent!");
+        loadFriendModal();
+    } else {
+        const data = await response.json();
+        alert(data.error);
+    }
+}
+
+async function respondToRequest(requestId, action) {
+    const method = action === 'decline' ? 'DELETE' : 'POST';
+    const url = action === 'decline' ? `/friend/request/${requestId}` : `/friend/accept/${requestId}`;
+
+    try {
+        const response = await fetch(url, { method: method });
+        if (response.ok) {
+            alert("Done!");
+            loadFriendModal();
+        } else {
+            const data = await response.json();
+            alert(data.error || "Error at action.");
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 
 window.onload = async () => {
     // Rendert sofort die Spiele, wenn die Seite lädt
@@ -114,22 +211,18 @@ window.onload = async () => {
     const usernameSection = document.getElementById('usernameSettingsSection');
     const uploadSection = document.getElementById('uploadSection');
 
-// auführen wenn die elemente auch wirklich existieren
     if (passwordSection && usernameSection) {
         if (currentSession && currentSession.loginMethod === 'local') {
-            // Lokaler User: Alles anzeigen
             passwordSection.style.display = 'block';
             usernameSection.style.display = 'block';
             if(uploadSection) uploadSection.style.display = 'block';
         } else {
-            // Google/Discord User: Alles ausblenden
             passwordSection.style.display = 'none';
             usernameSection.style.display = 'none';
             if(uploadSection) uploadSection.style.display = 'none';
         }
     }
 
-// listener für speichern
     const saveUsernameBtn = document.getElementById('saveUsernameBtn');
     if (saveUsernameBtn) {
         saveUsernameBtn.addEventListener('click', async () => {
@@ -147,11 +240,10 @@ window.onload = async () => {
                 alert("Username changed successfully!");
                 location.reload();
             } else {
-                alert(data.error); //once a day fehler
+                alert(data.error);
             }
         });
     }
-    // --- Profil-Modal Logik ---
     const profileIcon = document.querySelector('.user-profile');
     const profileModal = document.getElementById('profileModal');
 
@@ -174,7 +266,6 @@ window.onload = async () => {
             const loginInfo = document.getElementById('profileLoginInfo');
 
 
-            // Logik: Local zeigt Email, andere zeigen Provider
             if (currentSession.loginMethod === 'local') {
                 loginInfo.innerText = `Email: ${currentSession.email || 'Nicht hinterlegt'}`;
             } else {
@@ -193,7 +284,7 @@ window.onload = async () => {
             const activeLobbyBtn = document.getElementById('activeLobbyBtn');
             if (groupData.groupId && activeLobbyBtn) {
                 activeLobbyBtn.style.display = 'flex'; // Button sichtbar machen
-                activeLobbyBtn.href = `/lobby-room.html?id=${groupData.groupId}`; // Link zur aktiven Lobby setzen
+                activeLobbyBtn.href = `/lobby-room.html?id=${groupData.groupId}`;
             }
         }
     } catch(err) {
@@ -219,12 +310,21 @@ window.onload = async () => {
             const data = await response.json();
             if (data.success) {
                 alert("Bild erfolgreich hochgeladen!");
-                // Session lokal aktualisieren und UI refreshen
                 currentSession.avatar_url = data.avatar_url;
                 document.getElementById('profileAvatar').src = data.avatar_url;
             } else {
                 alert(data.error);
             }
         });
+    }
+
+    const fruendsIcon = document.getElementById('openFriendsModal');
+    const friendsModal = document.getElementById('friendsModal');
+
+    if (fruendsIcon && friendsModal) {
+        fruendsIcon.addEventListener('click', (e) => {
+            friendsModal.style.display = 'flex';
+            loadFriendModal();
+        })
     }
 };
