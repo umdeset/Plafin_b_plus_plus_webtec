@@ -50,7 +50,7 @@ async function loadFriendModal() {
         <h3>Your friends</h3>
         <div id="friendsList">Loading friends...</div>
         
-        <h3 style="margin-top: 20px;">Pending requests</h3>
+        <h3 style="margin-top: 20px;">Sent requests</h3>
         <div id="requestsList">Loading requests...</div>
     `;
 
@@ -89,7 +89,7 @@ async function loadFriendModal() {
 
                 return `
                 <div style="display:flex; justify-content:space-between; margin-bottom: 10px; padding: 10px; background: #3b3b46; border-radius: 5px;"> 
-                    <span>${isReceiver ? req.sender_name : 'To: ' + req.receiver_name}</span> 
+                    <span>${isReceiver ? req.sender_name : req.receiver_name}</span> 
                     ${actions} 
                 </div>`;
             }).join('');

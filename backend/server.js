@@ -392,7 +392,6 @@ app.post('/auth/discord', async (req, res) => {
             return res.status(400).json({ error: "Could not get Discord token" });
         }
 
-        // User von Discord abrufen
         const me = await fetch('https://discord.com/api/users/@me', {
             headers: {
                 authorization: `${oAuthData.token_type} ${oAuthData.access_token}`,
@@ -401,16 +400,13 @@ app.post('/auth/discord', async (req, res) => {
 
         const discordUser = await me.json();
 
-        // 1. Avatar-URL berechnen
         const avatarUrl = discordUser.avatar
             ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
             : `https://cdn.discordapp.com/embed/avatars/${parseInt(discordUser.discriminator || '0') % 5}.png`;
 
-        // 2. User in DB suchen
         let userResult = await db.query('SELECT * FROM users WHERE discord_id = $1', [discordUser.id]);
 
         if (userResult.rows.length === 0) {
-            // Neuer Discord User: INSERT
             const insertQuery = `
                 INSERT INTO users (username, discord_id, avatar_url) 
                 VALUES ($1, $2, $3) 
@@ -419,13 +415,11 @@ app.post('/auth/discord', async (req, res) => {
             userResult = await db.query(insertQuery, [discordUser.username, discordUser.id, avatarUrl]);
             console.log("New Discord User saved:", discordUser.username);
         } else {
-            // Bekannter User: UPDATE (falls sich das Profilbild geändert hat)
             const updateQuery = 'UPDATE users SET avatar_url = $1 WHERE discord_id = $2 RETURNING *';
             userResult = await db.query(updateQuery, [avatarUrl, discordUser.id]);
             console.log("Known Discord User logged in:", discordUser.username);
         }
 
-        // 3. Session mit avatar_url erstellen
         const user = userResult.rows[0];
         req.session.user = {
             id: user.id,
@@ -507,7 +501,6 @@ app.get("/groups", async (req, res) => {
             filters.push(`tags ILIKE $${values.length}`);
         }
 
-        //Wenn filter wird AND eingefügt
         if(filters.length > 0){
             query += ` WHERE ` + filters.join(' AND ');
         }
@@ -522,7 +515,6 @@ app.get("/groups", async (req, res) => {
     }
 });
 
-//Get Games endpoint für erstansicht der Gruppen am dashboard
 app.get("/games/load", async (req, res) => {
     try{
         const query = `
@@ -671,7 +663,6 @@ app.post("/groups/:id/join", requiredLogin, async (req, res) => {
         try{
           await db.query('INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)', [groupId, userId]);
         }catch(err){
-            //23505 Postgres besonderer Fehler "Unique Violation", bedeutet für uns das der user schon in dieser gruppe ist
             if(err.code === '23505'){
                 return res.status(400).json({error: "You already joined a group!"});
             }
@@ -745,7 +736,6 @@ app.get("/games/search", requiredLogin, async (req, res) => {
     const searchTerm = searchQuery.trim();
 
     try{
-        //nachschauen ob das game schon in der db ist
         const localSearch = await db.query('SELECT name, image_url FROM games WHERE name ILIKE $1 LIMIT 5', [`%${searchTerm}%`]);
 
         if(localSearch.rowCount > 0){
@@ -753,7 +743,6 @@ app.get("/games/search", requiredLogin, async (req, res) => {
             return res.status(200).json(localSearch.rows);
         }
 
-        //request RAWG API nach game
         console.log(`Game not found in db, request from RAWG API: ${searchTerm}...`);
         const response = await fetch(`https://api.rawg.io/api/games?search=${encodeURIComponent(searchTerm)}&key=${config.RAWG_API_KEY}`);
 
@@ -767,11 +756,9 @@ app.get("/games/search", requiredLogin, async (req, res) => {
             return res.status(404).json({error: "Could not find a game by that name"});
         }
 
-        //besten 3 ergebnise
         const topGames = data.results.slice(0, 3);
         const savedGames = [];
 
-        //Speichert bilder in db, wenn kein Bild gefunden wurde speichert es ein placeholder Bild
         for (const game of topGames){
             const img = game.background_image || "https://images.gostudent.org/user/avatar/eb378dcb-1c80-40af-b796-eb3ffa6a592b/400/400/image.png";
 
@@ -872,7 +859,6 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
     const userId = req.session.user.id;
 
     try {
-        // 1. Cooldown prüfen
         const result = await db.query('SELECT last_username_change FROM users WHERE id = $1', [userId]);
         const lastChange = result.rows[0].last_username_change;
 
@@ -883,21 +869,16 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
             }
         }
 
-        // 2. NUR den User aktualisieren
-        // Da du ON UPDATE CASCADE hast, wird die Datenbank automatisch die
-        // creator_username in der Tabelle 'groups' mit aktualisieren!
         await db.query(
             'UPDATE users SET username = $1, last_username_change = CURRENT_TIMESTAMP WHERE id = $2',
             [newUsername, userId]
         );
 
-        // 3. Session aktualisieren
         req.session.user.username = newUsername;
         res.status(200).json({ success: true });
 
     } catch (err) {
         console.error("Fehler beim Username ändern:", err);
-        // Prüfe, ob es ein Duplikat-Fehler (23505) ist
         if (err.code === '23505') {
             res.status(400).json({ error: "Username already taken." });
         } else {
@@ -916,7 +897,6 @@ app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, r
     const fileName = `avatar_${userId}_${Date.now()}.${fileExt}`;
 
     try {
-        // 1. In Supabase Storage hochladen
         const { data, error } = await supabase.storage
             .from('avatars') // Dein Bucket-Name
             .upload(fileName, req.file.buffer, {
@@ -926,17 +906,14 @@ app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, r
 
         if (error) throw error;
 
-        // 2. Öffentliche URL generieren
         const { data: publicUrlData } = supabase.storage
             .from('avatars')
             .getPublicUrl(fileName);
 
         const avatarUrl = publicUrlData.publicUrl;
 
-        // 3. In Datenbank speichern
         await db.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, userId]);
 
-        // 4. Session aktualisieren
         req.session.user.avatar_url = avatarUrl;
 
         res.status(200).json({ success: true, avatar_url: avatarUrl });
@@ -975,12 +952,11 @@ app.get('/friend/requests', requiredLogin, async (req, res) => {
         JOIN users u1 ON fr.sender_id = u1.id
         JOIN users u2 ON fr.receiver_id = u2.id
         WHERE (fr.sender_id = $1 OR fr.receiver_id = $1)
-        AND fr.status = 'pending'`; // WICHTIG: Nur pending!
+        AND fr.status = 'pending'`;
     const result = await db.query(query, [userId]);
     res.json(result.rows);
 });
 
-// server.js - Korrektur für DELETE
 app.delete('/friend/request/:id', requiredLogin, async (req, res) => {
     const requestId = req.params.id;
     const userId = req.session.user.id;
