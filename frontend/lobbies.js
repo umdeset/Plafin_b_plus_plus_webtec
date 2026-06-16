@@ -332,10 +332,14 @@ window.onload = async () => {
             });
 
             if (response.ok) {
+                const data = await response.json();
+
+                const newGroupId = data.group.id;
                 // Wenn geklappt schissst fenster und ladet neu
                 modal.style.display = 'none';
                 document.getElementById('createLobbyForm').reset();
-                await loadLobbies();
+                window.location.href = `/lobby-room.html?id=${newGroupId}`;
+
             } else {
                 console.error("Fehler beim Erstellen der Lobby");
                 alert("Could not create lobby. Please try again.");

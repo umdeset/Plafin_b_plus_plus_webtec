@@ -50,10 +50,10 @@ module.exports = (db, io) => {
             query += ` ORDER BY id DESC;`;
 
             const result = await db.query(query, values);
-            res.status(200).json(result.rows);
+            res.status(200).sendData(result.rows);
         }catch(err){
             console.error("Error fetching groups from database:", err);
-            res.status(500).json({error: "Internal Server Error"});
+            res.status(500).sendData({error: "Internal Server Error"});
         }
     });
 
@@ -135,9 +135,10 @@ module.exports = (db, io) => {
         }
     })
 
-    router.put("/:id", requiredLogin, async (req, res) => {
+    //update lobby
+    router.patch("/:id", requiredLogin, async (req, res) => {
         const groupId = parseInt(req.params.id, 10);
-        const {game, description, max_players} = req.body;
+        const {game, description, max_players, title} = req.body;
         const creator_username = req.session.user.username;
 
         try{
@@ -146,12 +147,19 @@ module.exports = (db, io) => {
             SET 
                 game = COALESCE($1, game),
                 description = COALESCE($2, description),
-                max_players = COALESCE($3, max_players)
-            WHERE id = $4 AND creator_username = $5
-            RETURNING id, game, description, max_players, current_players, creator_username;
+                max_players = COALESCE($3, max_players),
+                title = COALESCE($4, title)
+            WHERE id = $5 AND creator_username = $6
+            RETURNING id, game, description, max_players, title, current_players, creator_username;
         `;
 
-            const values = [game || null, description || null, max_players ? parseInt(max_players) : null, groupId, creator_username];
+            const data = await db.query('SELECT current_players FROM groups WHERE id = $1 AND creator_username = $2', [groupId, creator_username]);
+            const group = data.rows[0];
+
+            if(max_players < group.current_players){
+                return res.status(400).json({error: "There are to many players in your group"});
+            }
+            const values = [game || null, description || null, max_players ? parseInt(max_players) : null, title || null, groupId, creator_username];
             const result = await db.query(query, values);
 
             if(result.rowCount === 0){
@@ -214,6 +222,7 @@ module.exports = (db, io) => {
     router.delete("/:id/leave", requiredLogin, async (req, res) => {
         const groupId = parseInt(req.params.id, 10);
         const userId = req.session.user.id;
+        const username = req.session.user.username
 
 
         try{
@@ -236,9 +245,10 @@ module.exports = (db, io) => {
 
             const updatedGroup = await db.query(query, [groupId]);
 
-            const isEmpty = await db.query('SELECT current_players FROM groups WHERE id = $1',[groupId]);
-            const remainingPlayers = isEmpty.rows[0].current_players
-            if(remainingPlayers === 0){
+            const request = await db.query('SELECT current_players, creator_username FROM groups WHERE id = $1',[groupId]);
+            const remainingPlayers = request.rows[0].current_players
+            const creator = request.rows[0].creator_username
+            if(remainingPlayers === 0 || creator === username){
                 const query = `
             DELETE FROM groups 
             WHERE id = $1
@@ -270,7 +280,7 @@ module.exports = (db, io) => {
         ORDER BY group_members.joined_at ASC;
         `;
             const result = await db.query(query, [groupId]);
-            res.status(200).json(result.rows);
+            res.status(200).sendData(result.rows);
         }catch(err){
             console.error("Error fetching group members", err);
             res.status(500).json({error: "Internal Server Error"});
@@ -281,7 +291,7 @@ module.exports = (db, io) => {
         try {
             const result = await db.query('SELECT * FROM groups WHERE id = $1', [req.params.id]);
             if (result.rowCount === 0) return res.status(404).json({error: "Lobby not found"});
-            res.status(200).json(result.rows[0]);
+            res.status(200).sendData(result.rows[0]);
         } catch (err) {
             res.status(500).json({error: "Internal Server Error"});
         }
