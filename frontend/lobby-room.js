@@ -12,6 +12,17 @@ async function loadRoomData() {
         document.getElementById('roomTitle').innerText = roomInfo.title || `${roomInfo.game} Lounge`;
         document.getElementById('roomPlayerCount').innerText = `${roomInfo.current_players}/${roomInfo.max_players}`;
 
+        const updateBtn = document.getElementById('updateLobby');
+
+        if(currentSession.username === roomInfo.creator_username) {
+            updateBtn.style.display = 'block';
+
+            document.getElementById('editMaxPlayers').value = roomInfo.max_players;
+            document.getElementById('editDescription').value = roomInfo.description;
+        } else {
+            updateBtn.style.display = 'none';
+        }
+
         // members holen
         const membersRes = await fetch(`/groups/${roomId}/members`);
         const members = await membersRes.json();
@@ -19,7 +30,18 @@ async function loadRoomData() {
         const memberList = document.getElementById('memberList');
         memberList.innerHTML = '';
         members.forEach(member => {
-            memberList.innerHTML += `<li>${member.username}</li>`;
+            if(member.id === currentSession.id){
+                memberList.innerHTML += `
+                <li>
+                    <span class="member-name">${member.username}</span>
+                </li>`;
+            }else {
+                memberList.innerHTML += `
+                <li>
+                    <span class="member-name">${member.username}</span>
+                    <button class="btn-kick">Kick</button>
+                </li>`;
+            }
         });
 
     } catch (err) {
@@ -50,6 +72,8 @@ window.onload = async () => {
     socket.on('updatePlayerList', async () => {
         await loadRoomData();
     })
+
+    const updateLobby = document.getElementById('updateLobby');
 
     // Chat Logik
     const chatForm = document.getElementById('chatForm');
@@ -116,4 +140,45 @@ window.onload = async () => {
             location.replace('/');
         });
     }
+
+    const editModal = document.getElementById('editModal');
+    const buttonCloseEdit = document.getElementById('closeEditModal');
+    const updateLobbyButton = document.getElementById('updateLobby');
+
+    //Öffnet und schließt
+    updateLobbyButton.addEventListener('click', () => editModal.style.display = 'flex');
+    buttonCloseEdit.addEventListener('click', () => editModal.style.display = 'none');
+    window.addEventListener('click', (e) => {
+        if (e.target === editModal) editModal.style.display = 'none';
+    });
+
+    document.getElementById('editLobbyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const newTitle = document.getElementById('editTitle').value;
+        const newMaxPlayers = document.getElementById('editMaxPlayers').value;
+        const newDescription = document.getElementById('editDescription').value;
+
+        try{
+            const response = await fetch(`/groups/${roomId}`, {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    max_players: newMaxPlayers,
+                    description: newDescription,
+                    title: newTitle
+                })
+            });
+            if (response.ok) {
+                editModal.style.display = 'none';
+                await loadRoomData();
+                socket.emit('lobbiesChanged');
+            } else {
+                const errorData = await response.json();
+                alert(errorData.error);
+            }
+        }catch(err) {
+            console.error("Fehler beim Updaten der Lobby: ", err);
+        }
+    });
 };

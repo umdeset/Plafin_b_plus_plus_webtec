@@ -152,3 +152,124 @@
     background-color: #DB4437;
     color: white;
 }
+
+.room-info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+.room-info-header h2 {
+    margin: 0;
+    font-size: 20px;
+    border: none;
+    padding: 0;
+}
+
+.btn-edit {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: 0.2s;
+}
+.btn-edit:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+
+.modal-box {
+    background: #1e1e24;
+    width: 450px;
+    padding: 30px;
+    border-radius: 12px;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+    border: none;
+    padding: 0;
+}
+
+.close-modal-btn {
+    background: none; border: none; color: #aaa; font-size: 28px; cursor: pointer; transition: 0.2s;
+}
+
+.close-modal-btn:hover {
+    color: white;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex; flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px; color: #8b8d96; font-size: 14px; font-weight: bold;
+}
+
+.form-group input, .form-group textarea {
+    background: #2b2b36; border: 1px solid #444; color: white;
+    padding: 12px; border-radius: 8px; outline: none; font-family: inherit;
+}
+
+.form-group input:focus, .form-group textarea:focus {
+    border-color: #5865F2;
+}
+
+.btn-create-submit {
+    width: 100%; background: #5865F2; color: white; border: none;
+    padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer;
+    font-size: 16px; margin-top: 10px; transition: 0.2s;
+}
+
+.btn-create-submit:hover {
+    background: #4752C4;
+}
+
+.online-list li {
+    padding: 8px 0;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.member-name {
+    flex: 1;
+}
+
+.btn-kick {
+    background-color: transparent;
+    color: #DB4437;
+    border: 1px solid #DB4437;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.btn-kick:hover {
+    background-color: #DB4437;
+    color: white;
+}

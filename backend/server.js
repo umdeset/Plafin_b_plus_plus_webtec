@@ -15,7 +15,7 @@ const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const groupsRoutes = require("./routes/groups");
 const authRoutes= require("./routes/auth");
-const usersRoutes = require("./routes/users");
+const usersRoutes = require("./routes/user");
 const server = http.createServer(app);
 const io = new Server(server);
 
@@ -33,6 +33,25 @@ io.on('connection', (socket) => {
 
 // Parse urlencoded bodies
 app.use(express.json())
+
+
+//middleware für content negotiation bzw. Json oder XML
+app.use((req, res, next) => {
+    res.sendData = (data, rootName = 'data') => {
+        res.format({
+            'application/json': () => res.json(data),
+            'application/xml': () => {
+                const builder = new xml2js.Builder();
+                const xmlData = builder.buildObject({[rootName]: data});
+                res.type('application/xml').send(xmlData);
+            },
+            //Standard fall immer json
+            'default': () => res.json(data)
+        });
+    };
+    next();
+})
+
 let db;
 // Session middeware
 // instead of nodemon, use node server/server.js
@@ -178,8 +197,6 @@ app.post("/forgot-password", async (req, res) => {
 
         const user = result.rows[0];
 
-
-
         if (!user||!user.password_hash) {
             return res.status(200).json({ message: "If this account exists, you will receive an email." });
         }
@@ -280,7 +297,7 @@ app.get("/games/load", async (req, res) => {
         `;
 
         const result = await db.query(query);
-        res.status(200).json(result.rows);
+        res.status(200).sendData(result.rows);
     }catch(err){
         console.error("Error fetching groups from database:", err);
         res.status(500).json({error: "Internal Server Error"});
@@ -297,13 +314,15 @@ app.get("/games/search", requiredLogin, async (req, res) => {
     const searchTerm = searchQuery.trim();
 
     try{
+        //nachschauen ob das game schon in der db ist
         const localSearch = await db.query('SELECT name, image_url FROM games WHERE name ILIKE $1 LIMIT 5', [`%${searchTerm}%`]);
 
         if(localSearch.rowCount > 0){
             console.log(`Game Found in db: ${searchTerm}`);
-            return res.status(200).json(localSearch.rows);
+            return res.status(200).sendData(localSearch.rows);
         }
 
+        //request RAWG API nach game
         console.log(`Game not found in db, request from RAWG API: ${searchTerm}...`);
         const response = await fetch(`https://api.rawg.io/api/games?search=${encodeURIComponent(searchTerm)}&key=${config.RAWG_API_KEY}`);
 
@@ -317,9 +336,11 @@ app.get("/games/search", requiredLogin, async (req, res) => {
             return res.status(404).json({error: "Could not find a game by that name"});
         }
 
+        //besten 3 ergebnise
         const topGames = data.results.slice(0, 3);
         const savedGames = [];
 
+        //Speichert bilder in db, wenn kein Bild gefunden wurde speichert es ein placeholder Bild
         for (const game of topGames){
             const img = game.background_image || "https://images.gostudent.org/user/avatar/eb378dcb-1c80-40af-b796-eb3ffa6a592b/400/400/image.png";
 
@@ -331,7 +352,7 @@ app.get("/games/search", requiredLogin, async (req, res) => {
             await db.query(addQuery, [game.name, img]);
             savedGames.push({name: game.name, image_url: img});
         }
-        return res.status(200).json(savedGames);
+        return res.status(200).sendData(savedGames);
     }catch(err){
         console.error("Error fetching data from RAWG API", err);
         res.status(500).json({error: "Internal Server Error"});
@@ -409,6 +430,7 @@ app.post("/changeUsername", requiredLogin, async (req, res) => {
     }
 });
 const multer = require('multer');
+const xml2js = require("xml2js");
 const upload = multer({ storage: multer.memoryStorage() }); // Datei im RAM statt auf Festplatte
 
 app.post('/upload-avatar', requiredLogin, upload.single('avatar'), async (req, res) => {
@@ -527,10 +549,12 @@ connectDB().then(client => {
     db = client;
     console.log("Datenbank verbunden!");
 
+    // 2. Jetzt mounten wir den Router. Da das ganz unten passiert,
     // weiß der Router jetzt auch, dass es Sessions gibt und db ist befüllt!
     app.use('/groups', groupsRoutes(db, io));
     app.use('/auth', authRoutes(db, config))
-    app.use('/users', usersRoutes(db, io))
+    app.use('/user', usersRoutes(db, io))
+    // 3. Server starten
     server.listen(3000, () => {
         console.log('Server running at http://localhost:3000');
     });
