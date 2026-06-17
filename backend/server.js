@@ -545,6 +545,21 @@ app.get('/friend/list', async (req, res) => {
     }
 });
 
+app.delete('/friend/remove/:id', requiredLogin, async (req, res) => {
+    const friendId = req.params.id;
+    const userId = req.session.user.id;
+    try {
+        const result = await db.query(
+            'DELETE FROM friend_requests WHERE id = $1 AND status = $2 AND (sender_id = $3 OR receiver_id = $3)',
+            [friendId, 'accepted', userId]
+        );
+        if (result.rowCount === 0) return res.status(404).json({ error: "Friend not found." });
+        res.status(200).json({ message: "removed." });
+    } catch (err) {
+        res.status(500).json({ error: "Server Fehler" });
+    }
+});
+
 connectDB().then(client => {
     db = client;
     console.log("Datenbank verbunden!");
