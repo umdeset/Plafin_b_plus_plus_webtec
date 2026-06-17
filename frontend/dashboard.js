@@ -60,8 +60,13 @@ async function loadFriendModal() {
         const friendsDiv = document.getElementById('friendsList');
 
         friendsDiv.innerHTML = friends.length > 0
-            ? friends.map(f => `<div style="padding: 8px; border-bottom: 1px solid #444;">${f.username}</div>`).join('')
-            : '<p>No friends, loser :(.</p>';
+            ? friends.map(f => `
+        <div style="display:flex; justify-content:space-between; padding: 8px; border-bottom: 1px solid #444;">
+            <span>${f.username}</span>
+            <button onclick="removeFriend(${f.id})" style="color: red; cursor: pointer;">X</button>
+        </div>
+    `).join('')
+            : '<p>no friends.</p>';
     } catch (err) {
         console.error("Error at loading friends:", err);
     }
@@ -131,6 +136,18 @@ async function respondToRequest(requestId, action) {
         }
     } catch (err) {
         console.error(err);
+    }
+}
+
+async function removeFriend(friendId) {
+    if (!confirm("Remove??")) return;
+
+    const response = await fetch(`/friend/remove/${friendId}`, { method: 'DELETE' });
+    if (response.ok) {
+        alert("removed!");
+        loadFriendModal();
+    } else {
+        alert("error at removing.");
     }
 }
 
