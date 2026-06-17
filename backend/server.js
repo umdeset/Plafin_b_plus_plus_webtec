@@ -570,9 +570,13 @@ connectDB().then(client => {
     app.use('/auth', authRoutes(db, config))
     app.use('/user', usersRoutes(db, io))
     // 3. Server starten
-    server.listen(3000, () => {
-        console.log('Server running at http://localhost:3000');
-    });
+    //server.listen(3000, () => {
+     //   console.log('Server running at http://localhost:3000');
+   // });
+    //zum server erstellen
+    server.listen(3000, '0.0.0.0', () => {
+       console.log('Server running on all interfaces at http://172.20.10.5:3000');
+   });
 
 }).catch(err => {
     console.error("Kritischer Fehler: Datenbank konnte nicht verbunden werden!", err);
