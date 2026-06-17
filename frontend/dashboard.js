@@ -153,7 +153,7 @@ async function removeFriend(friendId) {
 
 async function toggleFavorite(gameId) {
     const response = await fetch(`/games/favorite/${gameId}`, {
-        method: 'PUT', // Das ist der entscheidende Unterschied!
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' }
     });
 
