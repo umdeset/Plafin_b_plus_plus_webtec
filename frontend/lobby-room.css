@@ -290,3 +290,56 @@
     background: #2b2b36; border: 1px solid #444; color: white;
     padding: 12px; border-radius: 8px; outline: none; width: 100%; box-sizing: border-box;
 }
+@media (max-width: 768px) {
+    body {
+        flex-direction: column !important;
+        overflow-y: auto;
+    }
+
+    .sidebar {
+        width: 100% !important;
+        height: 60px !important;
+        flex-direction: row !important;
+        position: fixed !important;
+        bottom: 0 !important;
+        top: auto !important;
+        z-index: 999;
+        padding-top: 0 !important;
+        justify-content: space-around !important;
+        background-color: #111116;
+    }
+
+    .menu {
+        flex-direction: row !important;
+        margin-top: 0 !important;
+        gap: 0 !important;
+    }
+
+    .main-content {
+        padding: 15px !important;
+        margin-bottom: 70px !important;
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    .logo, .logout-btn {
+        display: none !important;
+    }
+
+
+    .room-layout {
+        flex-direction: column !important;
+        height: auto !important;
+        padding: 10px !important;
+    }
+
+    .chat-section {
+        height: 50vh !important;
+        margin-bottom: 20px;
+    }
+
+    .info-section {
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+}
