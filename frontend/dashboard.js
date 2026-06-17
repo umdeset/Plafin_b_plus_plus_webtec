@@ -116,7 +116,7 @@ async function sendFriendRequest() {
         alert("Request sent!");
         loadFriendModal();
     } else {
-        const data = await response.json();
+        const data = await response.json(); //versprechen
         alert(data.error);
     }
 }
@@ -148,6 +148,19 @@ async function removeFriend(friendId) {
         loadFriendModal();
     } else {
         alert("error at removing.");
+    }
+}
+
+async function toggleFavorite(gameId) {
+    const response = await fetch(`/games/favorite/${gameId}`, {
+        method: 'PUT', // Das ist der entscheidende Unterschied!
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (response.ok) {
+        alert("Favorit Status geändert!");
+    } else {
+        alert("Fehler beim Speichern.");
     }
 }
 

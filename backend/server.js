@@ -121,6 +121,7 @@ app.post("/login", async (req, res) => {
                 id: user.id,
                 username: user.username,
                 email: user.email,
+                is_admin: user.is_admin,
                 loginMethod: 'local',
                 loginTime: new Date().toISOString(),
                 avatar_url: user.avatar_url,
@@ -559,6 +560,70 @@ app.delete('/friend/remove/:id', requiredLogin, async (req, res) => {
         res.status(500).json({ error: "Server Fehler" });
     }
 });
+
+const isAdmin = (req, res, next) => {
+    if (req.session.user && req.session.user.is_admin) {
+        next();
+    } else {
+        res.status(403).json({ error: "Zugriff verweigert. Nur für Admins." });
+    }
+};
+
+app.post('/admin/ban-user', isAdmin, async (req, res) => {
+    const { username } = req.body;
+    try {
+        await db.query('UPDATE users SET banned = TRUE WHERE username = $1', [username]);
+        res.status(200).json({ message: `User ${username} wurde gebannt.` });
+    } catch (err) {
+        res.status(500).json({ error: "Fehler beim Bannen." });
+    }
+});
+
+app.get('/admin.html', (req, res) => {
+    // Prüfen, ob User eingeloggt ist UND Admin-Flag hat
+    if (req.session.user && req.session.user.is_admin) {
+        res.sendFile(path.join(__dirname, '../frontend/admin.html'));
+    } else {
+        res.status(403).send("Zugriff verweigert! Nur für Admins.");
+    }
+});
+
+// Ban User
+app.post('/admin/ban-user', isAdmin, async (req, res) => {
+    const { username } = req.body;
+    try {
+        await db.query('UPDATE users SET banned = TRUE WHERE username = $1', [username]);
+        res.status(200).json({ message: `User ${username} wurde gebannt.` });
+    } catch (err) {
+        res.status(500).json({ error: "Fehler beim Bannen." });
+    }
+});
+
+// Lösche Lobby (wir brauchen die group_id)
+app.post('/admin/delete-lobby', isAdmin, async (req, res) => {
+    const { groupId } = req.body;
+    try {
+        await db.query('DELETE FROM groups WHERE id = $1', [groupId]);
+        res.status(200).json({ message: `Lobby ${groupId} gelöscht.` });
+    } catch (err) {
+        res.status(500).json({ error: "Fehler beim Löschen." });
+    }
+});
+
+// PUT: Ändert einen Status (z.B. Favoriten-Status eines Spiels)
+app.put('/games/favorite/:gameId', requiredLogin, async (req, res) => {
+    const { gameId } = req.params;
+    try {
+        // Beispiel: Wir setzen ein Feld 'is_favorite' auf true
+        await db.query('UPDATE user_games SET is_favorite = NOT is_favorite WHERE user_id = $1 AND game_id = $2',
+            [req.session.user.id, gameId]);
+
+        res.status(200).json({ success: true, message: "Favorit aktualisiert." });
+    } catch (err) {
+        res.status(500).json({ error: "Update fehlgeschlagen." });
+    }
+});
+
 
 connectDB().then(client => {
     db = client;
