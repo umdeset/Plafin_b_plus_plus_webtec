@@ -273,3 +273,20 @@
     background-color: #DB4437;
     color: white;
 }
+
+.tag-chip-container {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;
+}
+.tag-chip {
+    background-color: #5865F2; color: white; padding: 5px 12px;
+    border-radius: 15px; font-size: 12px; font-weight: bold;
+    display: flex; align-items: center; gap: 6px;
+}
+.tag-chip span {
+    cursor: pointer; font-size: 14px; transition: 0.2s;
+}
+.tag-chip span:hover { color: #ff4a4a; }
+.add-tag-input {
+    background: #2b2b36; border: 1px solid #444; color: white;
+    padding: 12px; border-radius: 8px; outline: none; width: 100%; box-sizing: border-box;
+}

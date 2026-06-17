@@ -138,7 +138,7 @@ module.exports = (db, io) => {
     //update lobby
     router.patch("/:id", requiredLogin, async (req, res) => {
         const groupId = parseInt(req.params.id, 10);
-        const {game, description, max_players, title} = req.body;
+        const {game, description, max_players, tags, title} = req.body;
         const creator_username = req.session.user.username;
 
         try{
@@ -148,9 +148,10 @@ module.exports = (db, io) => {
                 game = COALESCE($1, game),
                 description = COALESCE($2, description),
                 max_players = COALESCE($3, max_players),
-                title = COALESCE($4, title)
-            WHERE id = $5 AND creator_username = $6
-            RETURNING id, game, description, max_players, title, current_players, creator_username;
+                tags = COALESCE($4, tags),
+                title = COALESCE($5, title)
+            WHERE id = $6 AND creator_username = $7
+            RETURNING id, game, description, max_players, tags, title, current_players, creator_username;
         `;
 
             const data = await db.query('SELECT current_players FROM groups WHERE id = $1 AND creator_username = $2', [groupId, creator_username]);
@@ -159,7 +160,7 @@ module.exports = (db, io) => {
             if(max_players < group.current_players){
                 return res.status(400).json({error: "There are to many players in your group"});
             }
-            const values = [game || null, description || null, max_players ? parseInt(max_players) : null, title || null, groupId, creator_username];
+            const values = [game || null, description || null, max_players ? parseInt(max_players) : null, tags || null, title || null, groupId, creator_username];
             const result = await db.query(query, values);
 
             if(result.rowCount === 0){
@@ -331,7 +332,6 @@ module.exports = (db, io) => {
         res.redirect(`/lobbies.html?game=${encodeURIComponent(game)}`);
 
     });
-
 
     return router;
 };

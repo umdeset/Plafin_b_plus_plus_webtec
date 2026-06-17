@@ -49,6 +49,9 @@
       <label>GAME</label>
       <select id="gameFilter">
       </select>
+      <select id="customTagFilter" class="game-filter-dropdown">
+        <option value="ALL">All TAGS</option>
+      </select>
     </div>
 
     <div class="filter-group">
@@ -115,12 +118,16 @@
         <div class="tags-row">
           <label class="radio-label"><input type="radio" name="modalMic" value="Required"> Mic Required</label>
           <label class="radio-label"><input type="radio" name="modalMic" value="Optional" checked> Mic Optional</label>
-          <input type="text" id="modalCustomTags" placeholder="Add Tag (e.g. No Toxic)" class="add-tag-input">
+        </div>
+
+        <div class="multi-tags-container" style="margin-top: 10px">
+          <div id="tagChipContainer" class="tag-chip-container"></div>
+          <input type="text" id="modalCustomTags" placeholder="Type in a tag." class="add-tag-input" autocomplete="off">
         </div>
       </div>
 
       <div class="form-group">
-        <label for="modalTitle">Titel</label>
+        <Flabel for="modalTitle">Titel</Flabel>
         <input type="text" id="modalTitle" placeholder="Chill Game" required>
       </div>
 

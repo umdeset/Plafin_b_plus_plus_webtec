@@ -2,6 +2,38 @@ let currentSession = null;
 const socket = io(); // Verbindet sich mit dem Server
 let roomId = null;
 
+let editTagsArray = [];
+const editTagInput = document.getElementById("editTagInput");
+const editTagChipContainer = document.getElementById("editTagChipContainer");
+
+function renderEditTagChips() {
+    editTagChipContainer.innerHTML = "";
+    editTagsArray.forEach((tag, index) => {
+        editTagChipContainer.innerHTML += `
+            <div class="tag-chip">
+                ${tag} <span onclick="removeEditTag(${index})">&times;</span>
+            </div>
+        `;
+    });
+}
+
+window.removeEditTag = function (index) {
+    editTagsArray.splice(index, 1);
+    renderEditTagChips();
+};
+
+editTagInput.addEventListener("keydown", (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const newTag = editTagInput.value.trim().replace(',', '');
+        if(newTag && !editTagsArray.includes(newTag)) {
+            editTagsArray.push(newTag);
+            renderEditTagChips();
+        }
+        editTagInput.value = "";
+    }
+});
+
 async function loadRoomData() {
     try {
         // Lobby Info holen
@@ -19,6 +51,15 @@ async function loadRoomData() {
 
             document.getElementById('editMaxPlayers').value = roomInfo.max_players;
             document.getElementById('editDescription').value = roomInfo.description;
+            document.getElementById('editTitle').value = roomInfo.title || "";
+
+            if(roomInfo.tags){
+                editTagsArray = roomInfo.tags.split(',').map(tag => tag.trim());
+            } else {
+                editTagsArray = [];
+            }
+            renderEditTagChips();
+
         } else {
             updateBtn.style.display = 'none';
         }
@@ -166,6 +207,8 @@ window.onload = async () => {
         const newTitle = document.getElementById('editTitle').value;
         const newMaxPlayers = document.getElementById('editMaxPlayers').value;
         const newDescription = document.getElementById('editDescription').value;
+        //Tags werden wieder zu einem String zusammengebaut
+        const finalTags = editTagsArray.join(', ')
 
         try{
             const response = await fetch(`/groups/${roomId}`, {
@@ -174,6 +217,7 @@ window.onload = async () => {
                 body: JSON.stringify({
                     max_players: newMaxPlayers,
                     description: newDescription,
+                    tags: finalTags,
                     title: newTitle
                 })
             });

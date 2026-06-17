@@ -47,12 +47,51 @@ async function loadLobbies() {
             currentSelectedGame = "ALL";
         }
 
+        const tagFilter = document.getElementById('customTagFilter');
+        let currentSelectedTag = tagFilter ? tagFilter.value : "ALL";
+
+        if(tagFilter) {
+            const allTags = new Set();
+            groups.forEach(group => {
+                if(group.tags){
+                    group.tags.split(',').forEach(tag => {
+                        const cleanTag = tag.trim();
+                        if(cleanTag) allTags.add(cleanTag);
+                    })
+                }
+            });
+
+            let tagDropdownMenu = '<option value="ALL">ALL TAGS</option>';
+
+            [...allTags].sort().forEach(tag => {
+                tagDropdownMenu += `<option value="${tag}">${tag}</option>`;
+            });
+
+            tagFilter.innerHTML = tagDropdownMenu;
+
+            if (currentSelectedTag === "ALL" || allTags.has(currentSelectedTag)) {
+                tagFilter.value = currentSelectedTag;
+            }else{
+                tagFilter.value = "ALL";
+                currentSelectedTag = "ALL";
+            }
+
+        }
+
         let html = '';
 
         // filter logik
         const filteredGroups = groups.filter(group => {
             // Check Game
             if (currentSelectedGame !== "ALL" && group.game !== currentSelectedGame) return false;
+
+            if(tagFilter && currentSelectedTag !== "ALL") {
+                if(!group.tags) return false;
+
+                const tagsArray = group.tags.split(',').map(tag => tag.trim().toLowerCase());
+
+                if(!tagsArray.includes(currentSelectedTag.toLowerCase())) return false;
+            }
 
             // Wir wandeln die Tags aus der DB in Kleinbuchstaben um um Fehler zu vermeiden
             const groupTags = group.tags ? group.tags.toLowerCase() : "";
@@ -164,6 +203,15 @@ window.onload = async () => {
     // Filter Event-Listener einrichten
     if (gameSelect) {
         gameSelect.addEventListener('change', loadLobbies);
+    }
+
+    if(gameSelect) {
+        gameSelect.addEventListener('change', loadLobbies);
+    }
+
+    const tagSelect = document.getElementById('customTagFilter');
+    if(tagSelect) {
+        tagSelect.addEventListener('change', loadLobbies);
     }
 
     // Toggle Button Logik (Casual/Ranked)
@@ -297,6 +345,46 @@ window.onload = async () => {
         if (val < 64) maxPlayersInput.value = val + 1;
     });
 
+
+    //tags
+    let customTagsArray = [];
+    const tagInput = document.getElementById('modalCustomTags');
+    const tagChipContainer = document.getElementById('tagChipContainer');
+
+    tagInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            //Unterdrückt das standardverhalten vom Browser also das er automatisch losschickt
+            e.preventDefault();
+
+            const newTag = tagInput.value.trim().replace(',','');
+
+            //falls der Tag nicht leer ist und neu also nicht schon benutzt wurde
+            if(newTag && !customTagsArray.includes(newTag)) {
+                customTagsArray.push(newTag);
+                renderTagChips();
+            }
+            //zum leeren des Eingabefeldes
+            tagInput.value = '';
+        }
+    });
+
+    function renderTagChips() {
+        tagChipContainer.innerHTML = '';
+        customTagsArray.forEach((tag, index) => {
+            tagChipContainer.innerHTML += `
+            <div class="tag-chip">
+                ${tag} <span onclick="removeTag(${index})">&times;</span>
+            </div>
+            `;
+        });
+    }
+
+    //feld zum entfernen der Tags
+    window.removeTag = function (index) {
+        customTagsArray.splice(index, 1);
+        renderTagChips();
+    }
+
     // Formular absenden abfangen
     document.getElementById('createLobbyForm').addEventListener('submit', async (e) => {
         e.preventDefault(); // Verhindert, dass die Seite neu lädt
@@ -308,11 +396,8 @@ window.onload = async () => {
         const desc = document.getElementById('modalDesc').value;
         const maxPlayers = document.getElementById('modalMaxPlayers').value;
         const mic = document.querySelector('input[name="modalMic"]:checked').value;
-        const customTag = document.getElementById('modalCustomTags').value;
 
-        // Tags zusammenbauen (z.B. "Casual, Optional, No Toxic")
-        let tagsArray = [mode, mic];
-        if (customTag.trim() !== '') tagsArray.push(customTag.trim());
+        let tagsArray = [mode, mic, ...customTagsArray];
         const finalTags = tagsArray.join(', ');
 
         const newLobbyData = {
@@ -338,6 +423,11 @@ window.onload = async () => {
                 // Wenn geklappt schissst fenster und ladet neu
                 modal.style.display = 'none';
                 document.getElementById('createLobbyForm').reset();
+
+                //tags leeren
+                customTagsArray = [];
+                renderTagChips();
+
                 window.location.href = `/lobby-room.html?id=${newGroupId}`;
 
             } else {
